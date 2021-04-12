@@ -1,0 +1,14 @@
+{
+    "languages":{"en":"English"},
+    "models": [
+        {
+            "lang": "en",
+            "model_type": "vosk",
+            "model_path": "vosk-model-small-en-us-0.15",
+            "load": true,
+            "pipeline": {
+                "transcribe": true
+            }
+        }
+    ]
+}
