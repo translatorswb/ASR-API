@@ -49,11 +49,9 @@ def parse_model_id(model_id):
     return lang, alt
 
 
-def get_vosk_transcriber(model_path):
-    model = Model(model_path)
-    rec = KaldiRecognizer(model, SAMPLE_RATE)
+def vosk_transcriber(wf, sample_rate, model):
+        rec = KaldiRecognizer(model, sample_rate)
 
-    def transcriber(wf):
         results = []
         while True:
            data = wf.readframes(4000)
@@ -64,31 +62,24 @@ def get_vosk_transcriber(model_path):
         #results.append(json.loads(rec.FinalResult()))
         return results
 
-    return transcriber
-
 
 def do_transcribe(model_id, input):
-    #Preprocess 
-    #...
-
+   
     #Wav read
     try:
         wf = wave.open(input.file, "rb")
-        if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-            print ("Audio file not WAV format mono PCM.")
-            raise HTTPException(status_code=404, detail="Audio file not WAV format mono PCM.")
     except:
         raise HTTPException(status_code=404, detail="Broken WAV")
-
-
-    print("Framerate", wf.getframerate())
         
-    #transcriber = loaded_models[model_id]['transcriber']
-    results = []
-    if loaded_models[model_id]['transcriber']:
-        results = loaded_models[model_id]['transcriber'](wf)
+    if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
+        raise HTTPException(status_code=404, detail="Audio file not WAV format mono PCM.")
 
-    #Postprocess
+
+    framerate = wf.getframerate()
+    
+    results = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'])
+
+    #Postprocess (text)
     #...
     text = " ".join([r["text"] for r in results])
 
@@ -117,10 +108,10 @@ def load_models(config_path):
         language_codes = config_data['languages']
         print("Languages: %s"%language_codes)
     else:
-        print("WARNING: Language name spefication dictionary ('languages') not found in configuration." )
+        print("WARNING: Language name specification dictionary ('languages') not found in configuration." )
 
     if not 'models' in config_data:
-        print("ERROR: Model spefication list ('models') not found in configuration." )
+        print("ERROR: Model specification list ('models') not found in configuration." )
         return 0
 
     for model_config in config_data['models']:
@@ -128,11 +119,11 @@ def load_models(config_path):
             #CONFIG CHECKS
             #Check if model_type and lang fields are specified
             if not 'lang' in model_config:
-                print("WARNING: Language (lang) not speficied for a model. Skipping load")
+                print("WARNING: Language (lang) not speficied for a model. Skipping load.")
                 continue
 
             if not 'model_type' in model_config:
-                print("WARNING: Model type (model_type) not speficied for model. Skipping load")
+                print("WARNING: Model type (model_type) not speficied for model. Skipping load.")
                 continue
 
             if not model_config['model_type'] in SUPPORTED_MODEL_TYPES:
@@ -153,51 +144,30 @@ def load_models(config_path):
 
             #Check if language names exist for the language ids
             if not model['lang'] in language_codes:
-                print("WARNING: Source language code %s not defined in languages dict. This will surely break something."%model['lang'])
+                print("WARNING: Source language code %s not defined in languages dict. This will probably break something."%model['lang'])
 
-            #Check model path
+            #Check ASR model path
             if 'model_path' in model_config and model_config['model_path']:
                 model_dir = os.path.join(MODELS_ROOT_DIR, model_config['model_path'])
                 if not os.path.exists(model_dir):
-                    print("WARNING: Model path %s not found for model %s. Can't load custom translation model or segmenters."%(model_dir, model_id))
-                    model_dir = None
+                    print("WARNING: Model path %s not found for model %s. Skipping load."%(model_dir, model_id))
+                    continue
             else:
-                print("WARNING: Model path not specified for model %s. Can't load custom translation model or segmenters."%model_id)
-                model_dir = None
+                print("WARNING: Model path not specified for model %s. Skipping load."%model_id)
+                continue
 
             #Check conflicting model ids
             if model_id in loaded_models:
-                print("WARNING: Overwriting model %s since there are duplicate entries. Make sure you give an 'alt' ids to load alternate models."%model_id)
+                print("WARNING: Overwriting model %s. Make sure you give an 'alt' ids to load alternate models for same language."%model_id)
 
             #Load model pipeline
             print("Model: %s ("%model_id, end=" ")
-
-            #Load pre/post-processors
-            model['preprocessors'] = []
-            model['postprocessors'] = []
-
-            # TEMPLATE
-            # if 'preprocess' in model_config['pipeline'] and model_config['pipeline']['preprocess']:
-            #     model['preprocessors'].append(preprocessor)
-            #     print("preprocess", end=" ")
             
-            if 'transcribe' in model_config['pipeline'] and model_config['pipeline']['transcribe']:
-                print("transcribe", end="")
-                if model_config['model_type'] == 'vosk':
-                    if not model_dir:
-                        print("\nWARNING: Failed to load ctranslate model for %s: model_path not specified. Skipping load."%(model_id))
-                        continue
-
-                    # model['model'] = Model(model_dir)
-                    model['transcriber'] = get_vosk_transcriber(model_dir)
-                    print("-vosk", end=" ") 
-            else:
-                model['model'] = None
-
-            # TEMPLATE
-            # if 'postprocess' in model_config['pipeline'] and model_config['pipeline']['postprocess']:
-            #     model['postprocessors'].append(postprocessor)
-            #     print("postprocess", end=" ")
+            print("ASR", end="")
+            if model_config['model_type'] == 'vosk':
+                model['type'] = 'vosk'
+                model['stt-model'] = Model(model_dir)
+                print("-vosk", end=" ") 
 
             print(")")
 

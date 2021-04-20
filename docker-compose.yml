@@ -6,13 +6,10 @@ services:
     build: .
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     restart: unless-stopped
-    # runtime: nvidia  # Comment out in local
     ports:
       - 8005:8000
     environment:
       - ASR_API_CONFIG=/app/config.json
-      - ASR_API_DEVICE=cpu #or gpu, if so make runtime:nvidia
       - MODELS_ROOT=/app/models
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
+
 
