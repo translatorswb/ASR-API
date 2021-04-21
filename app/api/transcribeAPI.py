@@ -6,11 +6,12 @@ import os
 import json
 import re
 import wave
-
+import csv
 
 #constants
 CONFIG_JSON_PATH = os.getenv('ASR_API_CONFIG') 
 MODELS_ROOT_DIR = os.getenv('MODELS_ROOT')
+VOCABS_ROOT_DIR = os.getenv('VOCABS_ROOT')
 MOSES_TOKENIZER_DEFAULT_LANG = 'en'
 SUPPORTED_MODEL_TYPES = ['vosk']
 MODEL_TAG_SEPARATOR = "-"
@@ -26,7 +27,6 @@ language_codes = {}
 #processors
 # preprocessor =  lambda x: x #string IN -> string OUT
 # postprocessor =  lambda x: x #string IN -> string OUT
-
 
 #ASR operations
 def get_model_id(lang, alt_id=None):
@@ -48,23 +48,39 @@ def parse_model_id(model_id):
 
     return lang, alt
 
+def read_vocabulary(vocab_csv):
+    glossary_list = []
+    with open(vocab_csv, newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+        for row in reader:
+            if "\n" in row[0]:
+                print("Skipping %s"%row[0])
+            else:
+                glossary_list.append(row[0].lower())
+        
+    glossary_list = list(set(glossary_list))
+    glossary_list.sort()
+    glossary_list.append("[unk]")
+    return json.dumps(glossary_list), len(glossary_list)
 
-def vosk_transcriber(wf, sample_rate, model):
+def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
+    if vocabulary_json:
+        rec = KaldiRecognizer(model, sample_rate, vocabulary_json)
+    else:
         rec = KaldiRecognizer(model, sample_rate)
 
-        results = []
-        while True:
-           data = wf.readframes(4000)
-           if len(data) == 0:
-               break
-           if rec.AcceptWaveform(data):
-               results.append(json.loads(rec.Result()))
-        #results.append(json.loads(rec.FinalResult()))
-        return results
+    results = []
+    while True:
+       data = wf.readframes(4000)
+       if len(data) == 0:
+           break
+       if rec.AcceptWaveform(data):
+           results.append(json.loads(rec.Result()))
+    #results.append(json.loads(rec.FinalResult()))
+    return results
 
 
 def do_transcribe(model_id, input):
-   
     #Wav read
     try:
         wf = wave.open(input.file, "rb")
@@ -74,10 +90,9 @@ def do_transcribe(model_id, input):
     if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
         raise HTTPException(status_code=404, detail="Audio file not WAV format mono PCM.")
 
-
     framerate = wf.getframerate()
     
-    results = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'])
+    results = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
 
     #Postprocess (text)
     #...
@@ -85,7 +100,7 @@ def do_transcribe(model_id, input):
 
     return results, text
 
-def load_models(config_path):
+async def load_models(config_path):
     #Check if config file is there and well formatted
     if not os.path.exists(CONFIG_JSON_PATH):
         print("WARNING: Config file %s not found. No models will be loaded."%CONFIG_JSON_PATH)
@@ -102,6 +117,10 @@ def load_models(config_path):
     if not os.path.exists(MODELS_ROOT_DIR):
         print("ERROR: models directory not found. No models will be loaded.")
         return 0
+
+    #Check if VOCABS_ROOT_DIR exists
+    if not os.path.exists(VOCABS_ROOT_DIR):
+        print("WARNING: Vocabularies directory not found. No restricted vocabulary will be loaded.")
 
     if 'languages' in config_data:
         global language_codes
@@ -171,6 +190,18 @@ def load_models(config_path):
 
             print(")")
 
+            #Load restricted vocabulary (if any)
+            if os.path.exists(VOCABS_ROOT_DIR) and 'vocabulary' in model_config and model_config['vocabulary']:
+                vocab_path = os.path.join(VOCABS_ROOT_DIR, model_config['vocabulary'])
+                if not os.path.exists(vocab_path):
+                    print("WARNING: Vocabulary path %s not found for model %s. Skipping vocabulary load."%(vocab_path, model_id))
+                    continue
+
+                model['vocabulary'], no_items = read_vocabulary(vocab_path)
+                print("Restricted vocabulary: %i items"%no_items)
+            else:
+                model['vocabulary'] = None
+
             #All good, add model to the list
             loaded_models[model_id] = model
         
@@ -221,6 +252,8 @@ async def languages():
 
 @transcribe.on_event("startup")
 async def startup_event():
-    load_models(CONFIG_JSON_PATH)
+    print("starting up")
+    await load_models(CONFIG_JSON_PATH)
+    print(loaded_models["en"]['stt-model'])
 
 
