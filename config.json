@@ -5,7 +5,7 @@
             "lang": "en",
             "model_type": "vosk",
             "model_path": "vosk-model-small-en-us-0.15",
-            "vocabulary": "glossary_items_eng.csv",
+            "vocabulary": "",
             "load": true
         }
     ]

@@ -252,8 +252,5 @@ async def languages():
 
 @transcribe.on_event("startup")
 async def startup_event():
-    print("starting up")
     await load_models(CONFIG_JSON_PATH)
-    print(loaded_models["en"]['stt-model'])
-
 
