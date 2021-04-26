@@ -5,12 +5,12 @@ API for serving automatic speech recognition (ASR) models.
 
 ### Where to get ASR models?
 
-ASR API is only able to load Kaldi-based VOSK models currently. You can find many open-source models for various languages at [Alpha Cepei's website](https://alphacephei.com/vosk/models). 
+ASR API is only able to load Kaldi-based VOSK models currently. You can find open-source models for various languages at [Alpha Cepei's website](https://alphacephei.com/vosk/models). 
 
 ### How to integrate models?
 
 1) Place the model you want into `models` directory
-2) Add it to the configuration file. 
+2) Specify it in the configuration file. 
 
 ### Config file
 
@@ -60,9 +60,7 @@ uvicorn app.main:app --reload --port 8005
 
 `run_local.sh` script can be called to run quickly once requirements are installed.
 
-### Docker-compose
-
-To run it as a docker-container:
+### Run it as a docker-container
 
 ``` 
 docker-compose build
@@ -73,17 +71,54 @@ docker-compose up
 
 ### Transcription request
 
-#### cURL
+Transcription requests take in a mono PCM WAVE format file.
 
-#### Python
+#### cURL
+```
+curl -L -X POST 'http://localhost:8005/transcribe' -F 'file=@"my_audio.wav"' -F 'lang="en"'
+```
 
 ### Transcription response
 
+```
+{
+    "results": [
+        {
+            "result": [
+                {
+                    "conf": 1.0,
+                    "end": 1.14,
+                    "start": 0.51,
+                    "word": "hello"
+                }
+            ],
+            "text": "hello"
+        }
+    ],
+    "transcript": "hello"
+}
+```
+
 ### Retrieve languages
+
+Retrieves languages supported by the API.
 
 #### cURL
 
-#### Python
+```
+curl -L -X GET 'http://localhost:8005/transcribe/languages'
+```
 
 ### Retrieve languages response
+
+```
+{
+    "models": [
+        "en"
+    ],
+    "languages": {
+        "en": "English"
+    }
+}
+```
 
