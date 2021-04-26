@@ -219,7 +219,7 @@ class TranscriptionResponse(BaseModel):
     transcript: str
 
 class LanguagesResponse(BaseModel):
-    models: Dict
+    models: List
     languages: Dict
 
 @transcribe.post('/', status_code=200)
@@ -237,17 +237,7 @@ async def transcribe_audio(lang: str = Form(...), file: UploadFile = File(...)):
 
 @transcribe.get('/languages', status_code=200)
 async def languages():
-    languages_list = {}
-    for model_id in loaded_models.keys():
-        source, target, alt = parse_model_id(model_id)
-        if not source in languages_list:
-            languages_list[source] = {}
-        if not target in languages_list[source]:
-            languages_list[source][target] = []
-
-        languages_list[source][target].append(model_id)
-
-    return LanguagesResponse(languages=language_codes, models=languages_list)
+    return LanguagesResponse(languages=language_codes, models=list(loaded_models.keys()))
 
 
 @transcribe.on_event("startup")

@@ -11,6 +11,6 @@ services:
     environment:
       - ASR_API_CONFIG=/app/config.json
       - MODELS_ROOT=/app/models
-      - VOCABS_ROOT=/app/vocabs
+      - VOCABS_ROOT=/app/vocabularies
 
 
