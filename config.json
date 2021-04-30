@@ -7,6 +7,13 @@
             "model_path": "vosk-model-small-en-us-0.15",
             "vocabulary": "",
             "load": true
+        },
+        {
+            "lang": "en",
+            "alt": "customlm",
+            "model_type": "vosk",
+            "model_path": "vosk-model-small-en-us-0.15-customlm",
+            "load": false
         }
     ]
 }

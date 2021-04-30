@@ -1,5 +1,13 @@
+# from fastapi import FastAPI
+# from app.api.transcribeAPI import transcribe
+
+# app = FastAPI()
+
+# app.include_router(transcribe, prefix='/transcribe')
+
+
 from typing import List, Optional, Dict
-from fastapi import File, APIRouter, UploadFile, Form, HTTPException
+from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
 from pydantic import BaseModel, Field 
 from vosk import Model, KaldiRecognizer, SetLogLevel
 import os
@@ -7,6 +15,8 @@ import json
 import re
 import wave
 import csv
+
+app = FastAPI()
 
 #constants
 CONFIG_JSON_PATH = os.getenv('ASR_API_CONFIG') 
@@ -17,7 +27,7 @@ SUPPORTED_MODEL_TYPES = ['vosk']
 MODEL_TAG_SEPARATOR = "-"
 SAMPLE_RATE=44100
 
-transcribe = APIRouter()
+# transcribe = APIRouter()
 
 #models and data
 loaded_models = {}
@@ -209,11 +219,6 @@ async def load_models(config_path):
 
     
 #HTTP operations
-class TranslationRequest(BaseModel):
-    lang: str = Field(...)
-    alt: Optional[str] = None
-    # file: UploadFile = File(...)
-
 class TranscriptionResponse(BaseModel):
     results: List
     transcript: str
@@ -222,12 +227,12 @@ class LanguagesResponse(BaseModel):
     models: List
     languages: Dict
 
-@transcribe.post('/', status_code=200)
-async def transcribe_audio(lang: str = Form(...), file: UploadFile = File(...)):
-    model_id = get_model_id(lang) #TODO: No alternative model mechanism
-
+@app.post('/short', status_code=200)
+async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None)) :
+    model_id = get_model_id(lang, alt) 
+    
     if not model_id in loaded_models:
-        raise HTTPException(status_code=404, detail="Language pair %s is not supported."%model_id)
+        raise HTTPException(status_code=404, detail="Language %s is not supported."%model_id)
     
     r, t = do_transcribe(model_id, file)
 
@@ -235,12 +240,13 @@ async def transcribe_audio(lang: str = Form(...), file: UploadFile = File(...)):
     return response
 
 
-@transcribe.get('/languages', status_code=200)
+@app.get('/languages', status_code=200)
 async def languages():
     return LanguagesResponse(languages=language_codes, models=list(loaded_models.keys()))
 
 
-@transcribe.on_event("startup")
+@app.on_event("startup")
 async def startup_event():
     await load_models(CONFIG_JSON_PATH)
+    print("Models loaded successfully")
 
