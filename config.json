@@ -3,17 +3,11 @@
     "models": [
         {
             "lang": "en",
+            "alt": "glossary",
             "model_type": "vosk",
             "model_path": "vosk-model-small-en-us-0.15",
-            "vocabulary": "",
+            "vocabulary": "glossary_corpus_sorted_EN.txt",
             "load": true
-        },
-        {
-            "lang": "en",
-            "alt": "customlm",
-            "model_type": "vosk",
-            "model_path": "vosk-model-small-en-us-0.15-customlm",
-            "load": false
         }
     ]
 }

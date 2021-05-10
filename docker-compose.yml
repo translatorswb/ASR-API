@@ -4,7 +4,7 @@ services:
 
   asr:
     build: .
-    command: uvicorn app.transcribeAPI:app --reload --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     restart: unless-stopped
     ports:
       - 8005:8000
@@ -12,5 +12,5 @@ services:
       - ASR_API_CONFIG=/app/config.json
       - MODELS_ROOT=/app/models
       - VOCABS_ROOT=/app/vocabularies
-
+      # - PROXY_PREFIX=api  # Comment out in local
 

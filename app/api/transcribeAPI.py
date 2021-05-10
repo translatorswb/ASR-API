@@ -16,7 +16,7 @@ import re
 import wave
 import csv
 
-app = FastAPI()
+transcribe = APIRouter()
 
 #constants
 CONFIG_JSON_PATH = os.getenv('ASR_API_CONFIG') 
@@ -61,7 +61,7 @@ def parse_model_id(model_id):
 def read_vocabulary(vocab_csv):
     glossary_list = []
     with open(vocab_csv, newline='') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+        reader = csv.reader(csvfile)
         for row in reader:
             if "\n" in row[0]:
                 print("Skipping %s"%row[0])
@@ -80,14 +80,19 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
         rec = KaldiRecognizer(model, sample_rate)
 
     results = []
+    words = []
     while True:
        data = wf.readframes(4000)
        if len(data) == 0:
            break
        if rec.AcceptWaveform(data):
-           results.append(json.loads(rec.Result()))
+           #results.append(json.loads(rec.Result()))
+           segment_result = json.loads(rec.Result())
+           results.append(segment_result)
+
+           words.extend(segment_result['result'])
     #results.append(json.loads(rec.FinalResult()))
-    return results
+    return words
 
 
 def do_transcribe(model_id, input):
@@ -102,13 +107,13 @@ def do_transcribe(model_id, input):
 
     framerate = wf.getframerate()
     
-    results = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
+    words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
 
     #Postprocess (text)
     #...
-    text = " ".join([r["text"] for r in results])
+    transcript = " ".join([w["word"] for w in words])
 
-    return results, text
+    return words, transcript
 
 async def load_models(config_path):
     #Check if config file is there and well formatted
@@ -220,32 +225,32 @@ async def load_models(config_path):
     
 #HTTP operations
 class TranscriptionResponse(BaseModel):
-    results: List
+    words: List
     transcript: str
 
 class LanguagesResponse(BaseModel):
     models: List
     languages: Dict
 
-@app.post('/short', status_code=200)
+@transcribe.post('/short', status_code=200)
 async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None)) :
     model_id = get_model_id(lang, alt) 
     
     if not model_id in loaded_models:
         raise HTTPException(status_code=404, detail="Language %s is not supported."%model_id)
     
-    r, t = do_transcribe(model_id, file)
+    w, t = do_transcribe(model_id, file)
 
-    response = TranscriptionResponse(results=r, transcript=t)
+    response = TranscriptionResponse(words=w, transcript=t)
     return response
 
 
-@app.get('/languages', status_code=200)
+@transcribe.get('/', status_code=200)
 async def languages():
     return LanguagesResponse(languages=language_codes, models=list(loaded_models.keys()))
 
 
-@app.on_event("startup")
+@transcribe.on_event("startup")
 async def startup_event():
     await load_models(CONFIG_JSON_PATH)
     print("Models loaded successfully")

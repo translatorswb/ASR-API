@@ -27,14 +27,29 @@ ASR API is only able to load Kaldi-based VOSK models currently. You can find ope
 
 `model_path` refers to the directory under `models` where model data is stored. 
 
-By default, models are given a unique id associated with the language code. If you would like to have alternative models for a language use `alt` field in configuration specification. For example:
+By default, models are given a unique id associated with the language code. If you would like to have alternative models for a language, use `alt` field in configuration specification. For example:
 
 ```
 {
     "lang": "en",
+    "alt": "sp",
     "model_type": "vosk",
     "model_path": "my-special-english-model",
-    "alt": "sp",
+    "load": true
+}
+```
+
+### Vocabulary restriction
+
+If your application works in a restricted domain, you can specify a vocabulary file. To do that, make a text file containing all the words that you can possibly recognize line by line, place it under `vocabularies` folder and list the file on the model specification. For example:
+
+```
+{
+    "lang": "en",
+    "alt": "myvocabulary",
+    "model_type": "vosk",
+    "model_path": "vocabulary-restricted-english-model",
+    "vocabulary": "my-vocabulary.txt",
     "load": true
 }
 ```
@@ -47,6 +62,7 @@ Set the environment variables:
 ```
 MT_API_CONFIG=config.json
 MODELS_ROOT=models
+VOCABS_ROOT=vocabularies
 ```
 Install required libraries:
 ```
@@ -69,33 +85,40 @@ docker-compose up
 
 ## Sample requests and responses
 
-### Transcription request
+### Short transcription request
 
-Transcription requests take in a mono PCM WAVE format file.
+Transcription requests take in a mono PCM WAVE format file. 
 
 #### cURL
 ```
-curl -L -X POST 'http://localhost:8005/transcribe' -F 'file=@"my_audio.wav"' -F 'lang="en"'
+curl -L -X POST 'http://localhost:8005/transcribe/short' -F 'file=@"my_audio.wav"' -F 'lang="en"'
 ```
 
 ### Transcription response
 
 ```
 {
-    "results": [
+    "words": [
         {
-            "result": [
-                {
-                    "conf": 1.0,
-                    "end": 1.14,
-                    "start": 0.51,
-                    "word": "hello"
-                }
-            ],
-            "text": "hello"
+            "conf": 0.709742,
+            "end": 0.953598,
+            "start": 0.84,
+            "word": "good"
+        },
+        {
+            "conf": 1.0,
+            "end": 1.458019,
+            "start": 0.953598,
+            "word": "day"
+        },
+        {
+            "conf": 0.60063,
+            "end": 1.86,
+            "start": 1.47,
+            "word": "sir"
         }
     ],
-    "transcript": "hello"
+    "transcript": "good day sir"
 }
 ```
 
@@ -106,7 +129,7 @@ Retrieves languages supported by the API.
 #### cURL
 
 ```
-curl -L -X GET 'http://localhost:8005/transcribe/languages'
+curl -L -X GET 'http://localhost:8005/transcribe'
 ```
 
 ### Retrieve languages response
