@@ -4,8 +4,6 @@ from app.api.transcribeAPI import transcribe
 
 ROOT_PATH = '/' + os.environ.get('PROXY_PREFIX') if os.environ.get('PROXY_PREFIX') else None
 
-app = FastAPI()
-
 app = FastAPI(title="Speech API",
               description="API for automatic transcription and diarization",
               version="0.1", 

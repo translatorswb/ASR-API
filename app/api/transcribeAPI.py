@@ -88,10 +88,13 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
        if rec.AcceptWaveform(data):
            #results.append(json.loads(rec.Result()))
            segment_result = json.loads(rec.Result())
+           print(segment_result)
+           
            results.append(segment_result)
-
            words.extend(segment_result['result'])
-    #results.append(json.loads(rec.FinalResult()))
+    final_result = json.loads(rec.FinalResult())
+    results.append(final_result)
+    words.extend(final_result['result'])
     return words
 
 
