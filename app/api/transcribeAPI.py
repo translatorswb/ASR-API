@@ -1,8 +1,9 @@
 from typing import List, Optional, Dict
 from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
 from pydantic import BaseModel, Field 
-#from vosk import Model, KaldiRecognizer, SetLogLevel
+from vosk import Model, KaldiRecognizer, SetLogLevel
 from stt import Model, version
+import numpy as np
 import os
 import json
 import re
@@ -16,9 +17,10 @@ CONFIG_JSON_PATH = os.getenv('ASR_API_CONFIG')
 MODELS_ROOT_DIR = os.getenv('MODELS_ROOT')
 VOCABS_ROOT_DIR = os.getenv('VOCABS_ROOT')
 MOSES_TOKENIZER_DEFAULT_LANG = 'en'
-SUPPORTED_MODEL_TYPES = ['vosk']
+SUPPORTED_MODEL_TYPES = ['vosk', 'coqui']
 MODEL_TAG_SEPARATOR = "-"
-SAMPLE_RATE=44100
+COQUI_SCORER_FILENAME = 'model.scorer'
+COQUI_MODEL_FILENAME = 'graph.pb'
 
 #models and data
 loaded_models = {}
@@ -91,6 +93,32 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
     print(results)
     return words
 
+# def convert_samplerate(file_like, desired_sample_rate):
+#     #create empty file to copy the file_object to
+#     temp_dir = tempfile.gettempdir()
+#     local_wav_path = os.path.join(temp_dir, file_like.filename)
+#     local_wav = open(local_wav_path, 'wb+')
+#     shutil.copyfileobj(file_like.file, local_wav)
+#     local_wav.close()
+#     print(local_wav_path)
+
+#     sox_cmd = "sox {} --type raw --bits 16 --channels 1 --rate {} --encoding signed-integer --endian little --compression 0.0 --no-dither - ".format(
+#         local_wav_path, desired_sample_rate
+#     )
+#     try:
+#         output = subprocess.check_output(shlex.split(sox_cmd), stderr=subprocess.PIPE)
+#     except subprocess.CalledProcessError as e:
+#         raise RuntimeError("SoX returned non-zero status: {}".format(e.stderr))
+#     except OSError as e:
+#         raise OSError(
+#             e.errno,
+#             "SoX not found, use {}hz files or install it: {}".format(
+#                 desired_sample_rate, e.strerror
+#             ),
+#         )
+
+#     return np.frombuffer(output, np.int16)
+
 def do_transcribe(model_id, input):
     #Wav read
     try:
@@ -102,16 +130,21 @@ def do_transcribe(model_id, input):
         raise HTTPException(status_code=404, detail="Audio file not WAV format mono PCM.")
 
     framerate = wf.getframerate()
-    
-    if loaded_models[model_id]['model_type'] == 'vosk':
+
+    if loaded_models[model_id]['type'] == 'vosk':
         words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
-    elif loaded_models[model_id]['model_type'] == 'coqui':
+        transcript = " ".join([w["word"] for w in words])
+    elif loaded_models[model_id]['type'] == 'coqui':
+        if 'framerate' in loaded_models[model_id] and loaded_models[model_id]['framerate'] != framerate:
+            raise HTTPException(status_code=404, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
+        
+        audio = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
+        transcript = loaded_models[model_id]['stt-model'].stt(audio)
         words = []
 
     #Postprocess (text)
     #...
-    transcript = " ".join([w["word"] for w in words])
-
+    
     return words, transcript
 
 async def load_models(config_path):
@@ -183,10 +216,10 @@ async def load_models(config_path):
             if 'model_path' in model_config and model_config['model_path']:
                 model_dir = os.path.join(MODELS_ROOT_DIR, model_config['model_path'])
                 if not os.path.exists(model_dir):
-                    print("WARNING: Model path %s not found for model %s. Skipping load."%(model_dir, model_id))
+                    print("ERROR: Model path %s not found for model %s. Skipping load."%(model_dir, model_id))
                     continue
             else:
-                print("WARNING: Model path not specified for model %s. Skipping load."%model_id)
+                print("ERROR: Model path not specified for model %s. Skipping load."%model_id)
                 continue
 
             #Check conflicting model ids
@@ -201,6 +234,28 @@ async def load_models(config_path):
                 model['type'] = 'vosk'
                 model['stt-model'] = Model(model_dir)
                 print("-vosk", end=" ") 
+            elif model_config['model_type'] == 'coqui':
+                import stt
+                model['type'] = 'coqui'
+
+                model_path = os.path.join(model_dir, COQUI_MODEL_FILENAME)
+                if not os.path.exists(model_path):
+                    print("\nERROR: Can't find %s under model directory %s"%(COQUI_MODEL_FILENAME, model_dir))
+                    continue
+
+                model['stt-model'] = stt.Model(model_path)
+
+                print("-coqui", end=" ") 
+
+                scorer_path = os.path.join(model_dir, COQUI_SCORER_FILENAME)
+                if os.path.exists(scorer_path):
+                    model['stt-model'].enableExternalScorer(scorer_path)
+                    print("with scorer", end=" ")
+                else:
+                    print("without scorer", end=" ")
+            else:
+                print("\nERROR: Unknown model type", model_config['model_type'])
+                continue
 
             print(")")
 
@@ -215,6 +270,10 @@ async def load_models(config_path):
                 print("Restricted vocabulary: %i items"%no_items)
             else:
                 model['vocabulary'] = None
+
+            if 'framerate' in model_config:
+                model['framerate'] = model_config['framerate']
+                print("Framerate: %i"%model['framerate'])
 
             #All good, add model to the list
             loaded_models[model_id] = model

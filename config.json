@@ -1,18 +1,26 @@
 {
-    "languages":{"en":"English"},
+    "languages":{"en":"English", "bn":"Bengali"},
     "models": [
         {
             "lang": "en",
             "model_type": "vosk",
             "model_path": "vosk-model-small-en-us-0.15",
-            "load": true
+            "load": false
         },
-	{
+	    {
             "lang": "en",
             "alt": "glossary",
             "model_type": "vosk",
             "model_path": "vosk-model-en-us-aspire-0.2_glossarylm",
+            "load": false
+	    },
+        {
+            "lang": "bn",
+            "model_type": "coqui",
+            "framerate":16000,
+            "model_path": "coqui-bn-glossary",
             "load": true
-	}
+        }
+
     ]
 }
