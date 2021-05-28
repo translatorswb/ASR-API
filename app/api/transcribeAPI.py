@@ -9,7 +9,8 @@
 from typing import List, Optional, Dict
 from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
 from pydantic import BaseModel, Field 
-from vosk import Model, KaldiRecognizer, SetLogLevel
+#from vosk import Model, KaldiRecognizer, SetLogLevel
+from stt import Model, version
 import os
 import json
 import re
@@ -94,7 +95,6 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
     #results.append(json.loads(rec.FinalResult()))
     return words
 
-
 def do_transcribe(model_id, input):
     #Wav read
     try:
@@ -107,7 +107,10 @@ def do_transcribe(model_id, input):
 
     framerate = wf.getframerate()
     
-    words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
+    if loaded_models[model_id]['model_type'] == 'vosk':
+        words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
+    elif loaded_models[model_id]['model_type'] == 'coqui':
+        words = []
 
     #Postprocess (text)
     #...
