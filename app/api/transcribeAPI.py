@@ -1,11 +1,3 @@
-# from fastapi import FastAPI
-# from app.api.transcribeAPI import transcribe
-
-# app = FastAPI()
-
-# app.include_router(transcribe, prefix='/transcribe')
-
-
 from typing import List, Optional, Dict
 from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
 from pydantic import BaseModel, Field 
@@ -27,8 +19,6 @@ MOSES_TOKENIZER_DEFAULT_LANG = 'en'
 SUPPORTED_MODEL_TYPES = ['vosk']
 MODEL_TAG_SEPARATOR = "-"
 SAMPLE_RATE=44100
-
-# transcribe = APIRouter()
 
 #models and data
 loaded_models = {}
@@ -89,10 +79,16 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
        if rec.AcceptWaveform(data):
            #results.append(json.loads(rec.Result()))
            segment_result = json.loads(rec.Result())
+           print('segment:', segment_result)
+           
            results.append(segment_result)
-
            words.extend(segment_result['result'])
-    #results.append(json.loads(rec.FinalResult()))
+    final_result = json.loads(rec.FinalResult())
+    results.append(final_result)
+    if 'result' in final_result:
+        words.extend(final_result['result'])
+    
+    print(results)
     return words
 
 def do_transcribe(model_id, input):
