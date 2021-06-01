@@ -2,3 +2,4 @@ fastapi==0.63.0
 uvicorn==0.13.4
 python-multipart==0.0.5 
 vosk==0.3.21
+stt==0.10.0a6

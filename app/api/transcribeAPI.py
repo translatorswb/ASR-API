@@ -1,8 +1,6 @@
 from typing import List, Optional, Dict
 from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
 from pydantic import BaseModel, Field 
-from vosk import Model, KaldiRecognizer, SetLogLevel
-from stt import Model, version
 import numpy as np
 import os
 import json
@@ -132,9 +130,11 @@ def do_transcribe(model_id, input):
     framerate = wf.getframerate()
 
     if loaded_models[model_id]['type'] == 'vosk':
+        from vosk import Model, KaldiRecognizer, SetLogLevel
         words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
         transcript = " ".join([w["word"] for w in words])
     elif loaded_models[model_id]['type'] == 'coqui':
+        from stt import Model, version
         if 'framerate' in loaded_models[model_id] and loaded_models[model_id]['framerate'] != framerate:
             raise HTTPException(status_code=404, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
         
