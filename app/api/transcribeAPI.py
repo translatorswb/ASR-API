@@ -66,9 +66,9 @@ def read_vocabulary(vocab_csv):
 
 def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
     if vocabulary_json:
-        rec = KaldiRecognizer(model, sample_rate, vocabulary_json)
+        rec = vosk.KaldiRecognizer(model, sample_rate, vocabulary_json)
     else:
-        rec = KaldiRecognizer(model, sample_rate)
+        rec = vosk.KaldiRecognizer(model, sample_rate)
 
     results = []
     words = []
@@ -79,7 +79,6 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
        if rec.AcceptWaveform(data):
            #results.append(json.loads(rec.Result()))
            segment_result = json.loads(rec.Result())
-           print('segment:', segment_result)
            
            results.append(segment_result)
            words.extend(segment_result['result'])
@@ -88,7 +87,6 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
     if 'result' in final_result:
         words.extend(final_result['result'])
     
-    print(results)
     return words
 
 # def convert_samplerate(file_like, desired_sample_rate):
@@ -130,11 +128,9 @@ def do_transcribe(model_id, input):
     framerate = wf.getframerate()
 
     if loaded_models[model_id]['type'] == 'vosk':
-        from vosk import Model, KaldiRecognizer, SetLogLevel
         words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
         transcript = " ".join([w["word"] for w in words])
     elif loaded_models[model_id]['type'] == 'coqui':
-        from stt import Model, version
         if 'framerate' in loaded_models[model_id] and loaded_models[model_id]['framerate'] != framerate:
             raise HTTPException(status_code=404, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
         
@@ -231,10 +227,13 @@ async def load_models(config_path):
             
             print("ASR", end="")
             if model_config['model_type'] == 'vosk':
+                global vosk
+                import vosk
                 model['type'] = 'vosk'
-                model['stt-model'] = Model(model_dir)
+                model['stt-model'] = vosk.Model(model_dir)
                 print("-vosk", end=" ") 
             elif model_config['model_type'] == 'coqui':
+                global stt
                 import stt
                 model['type'] = 'coqui'
 
