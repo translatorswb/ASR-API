@@ -136,7 +136,7 @@ def do_transcribe(model_id, input):
         
         audio = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
         transcript = loaded_models[model_id]['stt-model'].stt(audio)
-        words = []
+        words = None
 
     #Postprocess (text)
     #...
@@ -288,6 +288,9 @@ async def load_models(config_path):
     
 #HTTP operations
 class TranscriptionResponse(BaseModel):
+    transcript: str
+
+class FullTranscriptionResponse(BaseModel):
     words: List
     transcript: str
 
@@ -296,15 +299,22 @@ class LanguagesResponse(BaseModel):
     languages: Dict
 
 @transcribe.post('/short', status_code=200)
-async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None)) :
+async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None), time:Optional[bool] = Form(False)) :
     model_id = get_model_id(lang, alt) 
     
     if not model_id in loaded_models:
-        raise HTTPException(status_code=404, detail="Language %s is not supported."%model_id)
+        raise HTTPException(status_code=400, detail="Language %s is not supported."%model_id)
     
     w, t = do_transcribe(model_id, file)
 
-    response = TranscriptionResponse(words=w, transcript=t)
+    if time:
+        if w != None:
+            response = FullTranscriptionResponse(words=w, transcript=t)
+        else:
+            raise HTTPException(status_code=400, detail="Model %s cannot give time information. Remove time flag."%model_id)
+    else:
+        response = TranscriptionResponse(transcript=t)
+
     return response
 
 
