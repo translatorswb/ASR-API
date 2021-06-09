@@ -17,8 +17,8 @@ VOCABS_ROOT_DIR = os.getenv('VOCABS_ROOT')
 MOSES_TOKENIZER_DEFAULT_LANG = 'en'
 SUPPORTED_MODEL_TYPES = ['vosk', 'coqui']
 MODEL_TAG_SEPARATOR = "-"
-COQUI_SCORER_FILENAME = 'model.scorer'
-COQUI_MODEL_FILENAME = 'graph.pb'
+COQUI_SCORER_EXT = '.scorer'
+COQUI_MODEL_EXT = '.pb'
 
 #models and data
 loaded_models = {}
@@ -120,10 +120,10 @@ def do_transcribe(model_id, input):
     try:
         wf = wave.open(input.file, "rb")
     except:
-        raise HTTPException(status_code=404, detail="Broken WAV")
+        raise HTTPException(status_code=400, detail="Broken WAV")
         
     if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-        raise HTTPException(status_code=404, detail="Audio file not WAV format mono PCM.")
+        raise HTTPException(status_code=400, detail="Audio file not WAV format mono PCM.")
 
     framerate = wf.getframerate()
 
@@ -132,7 +132,7 @@ def do_transcribe(model_id, input):
         transcript = " ".join([w["word"] for w in words])
     elif loaded_models[model_id]['type'] == 'coqui':
         if 'framerate' in loaded_models[model_id] and loaded_models[model_id]['framerate'] != framerate:
-            raise HTTPException(status_code=404, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
+            raise HTTPException(status_code=400, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
         
         audio = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
         transcript = loaded_models[model_id]['stt-model'].stt(audio)
@@ -237,21 +237,27 @@ async def load_models(config_path):
                 import stt
                 model['type'] = 'coqui'
 
-                model_path = os.path.join(model_dir, COQUI_MODEL_FILENAME)
-                if not os.path.exists(model_path):
-                    print("\nERROR: Can't find %s under model directory %s"%(COQUI_MODEL_FILENAME, model_dir))
+                model_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(COQUI_MODEL_EXT)]
+                if len(model_path_candidates) != 1:
+                    print("\nERROR: Can't find a unique model with extension .pb under model directory %s"%(model_dir))
                     continue
+
+                model_path = os.path.join(model_dir, model_path_candidates[0])
 
                 model['stt-model'] = stt.Model(model_path)
 
                 print("-coqui", end=" ") 
 
-                scorer_path = os.path.join(model_dir, COQUI_SCORER_FILENAME)
-                if os.path.exists(scorer_path):
+                scorer_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(COQUI_SCORER_EXT)]
+                if len(scorer_path_candidates) == 0:
+                    print("without scorer", end=" ")
+                elif len(scorer_path_candidates) == 1:
+                    scorer_path = os.path.join(model_dir, scorer_path_candidates[0])
                     model['stt-model'].enableExternalScorer(scorer_path)
                     print("with scorer", end=" ")
                 else:
-                    print("without scorer", end=" ")
+                    print("\nWARNING: More than one scorer under model directory", model_dir)
+
             else:
                 print("\nERROR: Unknown model type", model_config['model_type'])
                 continue
@@ -277,7 +283,7 @@ async def load_models(config_path):
             #All good, add model to the list
             loaded_models[model_id] = model
         
-    return 1
+    return len(loaded_models)
 
     
 #HTTP operations
@@ -309,6 +315,6 @@ async def languages():
 
 @transcribe.on_event("startup")
 async def startup_event():
-    await load_models(CONFIG_JSON_PATH)
-    print("Models loaded successfully")
+    no_models = await load_models(CONFIG_JSON_PATH)
+    print("%i models loaded successfully"%no_models)
 
