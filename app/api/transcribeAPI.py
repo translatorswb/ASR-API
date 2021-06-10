@@ -15,10 +15,10 @@ CONFIG_JSON_PATH = os.getenv('ASR_API_CONFIG')
 MODELS_ROOT_DIR = os.getenv('MODELS_ROOT')
 VOCABS_ROOT_DIR = os.getenv('VOCABS_ROOT')
 MOSES_TOKENIZER_DEFAULT_LANG = 'en'
-SUPPORTED_MODEL_TYPES = ['vosk', 'coqui']
+SUPPORTED_MODEL_TYPES = ['vosk', 'deepspeech']
 MODEL_TAG_SEPARATOR = "-"
-COQUI_SCORER_EXT = '.scorer'
-COQUI_MODEL_EXT = '.pb'
+DEEPSPEECH_SCORER_EXT = '.scorer'
+DEEPSPEECH_MODEL_EXT = '.pb'
 
 #models and data
 loaded_models = {}
@@ -130,7 +130,7 @@ def do_transcribe(model_id, input):
     if loaded_models[model_id]['type'] == 'vosk':
         words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
         transcript = " ".join([w["word"] for w in words])
-    elif loaded_models[model_id]['type'] == 'coqui':
+    elif loaded_models[model_id]['type'] == 'deepspeech':
         if 'framerate' in loaded_models[model_id] and loaded_models[model_id]['framerate'] != framerate:
             raise HTTPException(status_code=400, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
         
@@ -232,12 +232,12 @@ async def load_models(config_path):
                 model['type'] = 'vosk'
                 model['stt-model'] = vosk.Model(model_dir)
                 print("-vosk", end=" ") 
-            elif model_config['model_type'] == 'coqui':
+            elif model_config['model_type'] == 'deepspeech':
                 global stt
                 import stt
-                model['type'] = 'coqui'
+                model['type'] = 'deepspeech'
 
-                model_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(COQUI_MODEL_EXT)]
+                model_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(DEEPSPEECH_MODEL_EXT)]
                 if len(model_path_candidates) != 1:
                     print("\nERROR: Can't find a unique model with extension .pb under model directory %s"%(model_dir))
                     continue
@@ -246,9 +246,9 @@ async def load_models(config_path):
 
                 model['stt-model'] = stt.Model(model_path)
 
-                print("-coqui", end=" ") 
+                print("-deepspeech", end=" ") 
 
-                scorer_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(COQUI_SCORER_EXT)]
+                scorer_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(DEEPSPEECH_SCORER_EXT)]
                 if len(scorer_path_candidates) == 0:
                     print("without scorer", end=" ")
                 elif len(scorer_path_candidates) == 1:
