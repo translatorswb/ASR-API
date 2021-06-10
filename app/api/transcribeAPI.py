@@ -205,8 +205,14 @@ async def load_models(config_path):
             model_id = get_model_id(model_config['lang'], alt_id)
 
             #Check if language names exist for the language ids
-            if not model['lang'] in language_codes:
-                print("WARNING: Source language code %s not defined in languages dict. This will probably break something."%model['lang'])
+            if model['lang'] in language_codes:
+                if alt_id:
+                    model['lang-name'] = language_codes[model['lang']] + " (%s)"%alt_id
+                else:
+                    model['lang-name'] = language_codes[model['lang']]
+            else:
+                model['lang-name'] = "Unknown"
+                print("WARNING: Source language code %s not defined in languages dict. This might break something."%model['lang'])
 
             #Check ASR model path
             if 'model_path' in model_config and model_config['model_path']:
@@ -295,7 +301,6 @@ class FullTranscriptionResponse(BaseModel):
     transcript: str
 
 class LanguagesResponse(BaseModel):
-    models: List
     languages: Dict
 
 @transcribe.post('/short', status_code=200)
@@ -320,7 +325,8 @@ async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(
 
 @transcribe.get('/', status_code=200)
 async def languages():
-    return LanguagesResponse(languages=language_codes, models=list(loaded_models.keys()))
+    languages = {lang_code:loaded_models[lang_code]['lang-name'] for lang_code in loaded_models}
+    return LanguagesResponse(languages=languages)
 
 
 @transcribe.on_event("startup")
