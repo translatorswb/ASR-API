@@ -131,16 +131,16 @@ curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav
 #### Transcription response
 
 ```
-{  "transcript": "good day madam" }
+{ "transcript": "good day madam" , "time":1.204 }
 ```
 
-### Full transcription request (only with vosk models)
+### Transcription request with word timing information
 
-Full transcription request can be used for getting word timing information. 
+Word timing information can be obtained by setting `word_times` flag True on request. This feature currently works only with vosk models.
 
 #### Request with cURL
 ```
-curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav"' -F 'lang="en"' -F 'time="True"' -F 'alt="digits"'
+curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav"' -F 'lang="en"' -F 'word_times="True"' -F 'alt="digits"'
 ```
 
 #### Transcription response
@@ -173,9 +173,26 @@ curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav
             "word": "two"
         }
     ],
-    "transcript": "one three one two"
+    "transcript": "one three one two",
+    "time": 0.980
 }
 ```
+
+### Transcription request with runtime vocabulary
+
+You can restrict the model to recognize certain words during requests. To do that, enter the list of words you want to restrict to using the request field `vocabulary`
+
+#### Request with cURL
+```
+curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav"' -F 'lang="en"' -F 'vocabulary="[\"corona\", \"virus\"]"'
+```
+
+#### Transcription response
+
+{
+    "transcript": "corona virus",
+    "time": 0.152
+}
 
 ### Retrieve languages
 
