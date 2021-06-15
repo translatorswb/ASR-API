@@ -122,9 +122,6 @@ def update_voskrecognizer(model_id, framerate):
 def make_runtime_voskrecognizer(model_id, vocabulary_json):
     try:
         vocab_list = json.loads(vocabulary_json)
-        print(vocab_list)
-        for v in vocab_list:
-            print(v)
 
         vocab_list.append("[unk]")
         vocab_text = json.dumps(vocab_list)
@@ -383,9 +380,9 @@ async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(
     words, transcript, time = do_transcribe(model_id, file, vocabulary)
 
     if word_times:
-        response = FullTranscriptionResponse(words=words, transcript=transcript, time=time)
+        response = FullTranscriptionResponse(words=words, transcript=transcript, time="%.3f"%time)
     else:
-        response = TranscriptionResponse(transcript=transcript, time=time)
+        response = TranscriptionResponse(transcript=transcript, time="%.3f"%time)
 
     return response
 
