@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict
 from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
 from pydantic import BaseModel, Field 
+from time import perf_counter
 import numpy as np
 import os
 import json
@@ -18,7 +19,8 @@ MOSES_TOKENIZER_DEFAULT_LANG = 'en'
 SUPPORTED_MODEL_TYPES = ['vosk', 'deepspeech']
 MODEL_TAG_SEPARATOR = "-"
 DEEPSPEECH_SCORER_EXT = '.scorer'
-DEEPSPEECH_MODEL_EXT = '.pb'
+DEEPSPEECH_MODEL_EXT = ['.pb', '.pbmm']
+DEFAULT_FRAMERATE = 16000
 
 #models and data
 loaded_models = {}
@@ -64,12 +66,7 @@ def read_vocabulary(vocab_csv):
     glossary_list.append("[unk]")
     return json.dumps(glossary_list), len(glossary_list)
 
-def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
-    if vocabulary_json:
-        rec = vosk.KaldiRecognizer(model, sample_rate, vocabulary_json)
-    else:
-        rec = vosk.KaldiRecognizer(model, sample_rate)
-
+def vosk_transcriber(wf, rec):
     results = []
     words = []
     while True:
@@ -115,7 +112,31 @@ def vosk_transcriber(wf, sample_rate, model, vocabulary_json=None):
 
 #     return np.frombuffer(output, np.int16)
 
-def do_transcribe(model_id, input):
+def update_voskrecognizer(model_id, framerate):
+    if loaded_models[model_id]['vocabulary']:
+        loaded_models[model_id]['vosk-recognizer'] = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'], loaded_models[model_id]['vocabulary'])
+    else:
+        loaded_models[model_id]['vosk-recognizer'] = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'])
+
+
+def make_runtime_voskrecognizer(model_id, vocabulary_json):
+    try:
+        vocab_list = json.loads(vocabulary_json)
+        print(vocab_list)
+        for v in vocab_list:
+            print(v)
+
+        vocab_list.append("[unk]")
+        vocab_text = json.dumps(vocab_list)
+        temp_rec = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'], vocab_text)
+
+        print("Runtime vocabulary set: %s"%vocab_list)
+        return temp_rec
+    except:
+        raise HTTPException(status_code=400, detail="Cannot parse runtime vocabulary")
+        
+
+def do_transcribe(model_id, input, runtime_vocab=None):
     #Wav read
     try:
         wf = wave.open(input.file, "rb")
@@ -126,22 +147,48 @@ def do_transcribe(model_id, input):
         raise HTTPException(status_code=400, detail="Audio file not WAV format mono PCM.")
 
     framerate = wf.getframerate()
+    inference_start = perf_counter()
 
     if loaded_models[model_id]['type'] == 'vosk':
-        words = vosk_transcriber(wf, framerate, loaded_models[model_id]['stt-model'], loaded_models[model_id]['vocabulary'])
-        transcript = " ".join([w["word"] for w in words])
+        if framerate != loaded_models[model_id]['framerate']:
+            loaded_models[model_id]['framerate'] = framerate
+            print("Changing model %s's framerate to %i"%(model_id, framerate))
+
+            update_voskrecognizer(model_id, framerate)
+
+        if runtime_vocab:
+            rec = make_runtime_voskrecognizer(model_id, runtime_vocab)
+        else:
+            rec = loaded_models[model_id]['vosk-recognizer']
+
+        try:
+            words = vosk_transcriber(wf, rec)
+            transcript = " ".join([w["word"] for w in words])
+        except:
+            raise HTTPException(status_code=500, detail="Problem occured with vosk transcriber")
+            
     elif loaded_models[model_id]['type'] == 'deepspeech':
         if 'framerate' in loaded_models[model_id] and loaded_models[model_id]['framerate'] != framerate:
             raise HTTPException(status_code=400, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
         
-        audio = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
-        transcript = loaded_models[model_id]['stt-model'].stt(audio)
-        words = None
+        try:
+            audio = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
+        except:
+            raise HTTPException(status_code=500, detail="Problem reading audio")
+
+        try:
+            transcript = loaded_models[model_id]['stt-model'].stt(audio)
+        except:
+            raise HTTPException(status_code=500, detail="Problem occured with deepspeech transcriber")
+
+        words = None #coqui stt does not support word alignment?
+
+    inference_time = perf_counter() - inference_start
 
     #Postprocess (text)
     #...
     
-    return words, transcript
+    return words, transcript, inference_time
 
 async def load_models(config_path):
     #Check if config file is there and well formatted
@@ -232,20 +279,47 @@ async def load_models(config_path):
             print("Model: %s ("%model_id, end=" ")
             
             print("ASR", end="")
+
+            if 'framerate' in model_config:
+                model['framerate'] = model_config['framerate']
+            else:
+                model['framerate'] = DEFAULT_FRAMERATE
+
+
+
             if model_config['model_type'] == 'vosk':
                 global vosk
                 import vosk
+
                 model['type'] = 'vosk'
                 model['stt-model'] = vosk.Model(model_dir)
+
+                #Load restricted vocabulary (if any)
+                if os.path.exists(VOCABS_ROOT_DIR) and 'vocabulary' in model_config and model_config['vocabulary']:
+                    vocab_path = os.path.join(VOCABS_ROOT_DIR, model_config['vocabulary'])
+                    if not os.path.exists(vocab_path):
+                        print("WARNING: Vocabulary path %s not found for model %s. Skipping vocabulary load."%(vocab_path, model_id))
+                        continue
+
+                    model['vocabulary'], model['vocabulary-size'] = read_vocabulary(vocab_path)
+                    
+                else:
+                    model['vocabulary'] = None
+                    model['vocabulary-size'] = 0
+
+                if model['vocabulary']:
+                    model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'], model['vocabulary'])
+                else:
+                    model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'])
                 print("-vosk", end=" ") 
             elif model_config['model_type'] == 'deepspeech':
                 global stt
                 import stt
                 model['type'] = 'deepspeech'
 
-                model_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(DEEPSPEECH_MODEL_EXT)]
+                model_path_candidates = [f for f in os.listdir(model_dir) if os.path.splitext(f)[1] in DEEPSPEECH_MODEL_EXT]
                 if len(model_path_candidates) != 1:
-                    print("\nERROR: Can't find a unique model with extension .pb under model directory %s"%(model_dir))
+                    print("\nERROR: Can't find a unique model with extension .pb or .pbmm under model directory %s"%(model_dir))
                     continue
 
                 model_path = os.path.join(model_dir, model_path_candidates[0])
@@ -270,21 +344,9 @@ async def load_models(config_path):
 
             print(")")
 
-            #Load restricted vocabulary (if any)
-            if os.path.exists(VOCABS_ROOT_DIR) and 'vocabulary' in model_config and model_config['vocabulary']:
-                vocab_path = os.path.join(VOCABS_ROOT_DIR, model_config['vocabulary'])
-                if not os.path.exists(vocab_path):
-                    print("WARNING: Vocabulary path %s not found for model %s. Skipping vocabulary load."%(vocab_path, model_id))
-                    continue
-
-                model['vocabulary'], no_items = read_vocabulary(vocab_path)
-                print("Restricted vocabulary: %i items"%no_items)
-            else:
-                model['vocabulary'] = None
-
-            if 'framerate' in model_config:
-                model['framerate'] = model_config['framerate']
-                print("Framerate: %i"%model['framerate'])
+            print("Framerate: %i"%model['framerate'])
+            if model['vocabulary']:
+                print("Vocabulary size: %i"%model['vocabulary-size'])
 
             #All good, add model to the list
             loaded_models[model_id] = model
@@ -295,30 +357,35 @@ async def load_models(config_path):
 #HTTP operations
 class TranscriptionResponse(BaseModel):
     transcript: str
+    time: float
 
 class FullTranscriptionResponse(BaseModel):
     words: List
     transcript: str
+    time: float
 
 class LanguagesResponse(BaseModel):
     languages: Dict
 
 @transcribe.post('/short', status_code=200)
-async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None), time:Optional[bool] = Form(False)) :
+async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None), word_times:Optional[bool] = Form(False), vocabulary:Optional[str] = Form(None)) :
     model_id = get_model_id(lang, alt) 
     
     if not model_id in loaded_models:
         raise HTTPException(status_code=400, detail="Language %s is not supported."%model_id)
-    
-    w, t = do_transcribe(model_id, file)
 
-    if time:
-        if w != None:
-            response = FullTranscriptionResponse(words=w, transcript=t)
-        else:
-            raise HTTPException(status_code=400, detail="Model %s cannot give time information. Remove time flag."%model_id)
+    if word_times and loaded_models[model_id]['type'] != 'vosk':
+        raise HTTPException(status_code=400, detail="Model %s cannot give word timing information. Remove word_times flag."%model_id)
+
+    if vocabulary and loaded_models[model_id]['type'] != 'vosk':
+        raise HTTPException(status_code=400, detail="Model %s cannot take runtime vocabulary. Remove vocabulary specification."%model_id)
+    
+    words, transcript, time = do_transcribe(model_id, file, vocabulary)
+
+    if word_times:
+        response = FullTranscriptionResponse(words=words, transcript=transcript, time=time)
     else:
-        response = TranscriptionResponse(transcript=t)
+        response = TranscriptionResponse(transcript=transcript, time=time)
 
     return response
 
