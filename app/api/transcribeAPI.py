@@ -125,12 +125,18 @@ def make_runtime_voskrecognizer(model_id, vocabulary_json):
 
         vocab_list.append("[unk]")
         vocab_text = json.dumps(vocab_list)
+
+    except:
+        raise HTTPException(status_code=400, detail="Cannot parse runtime vocabulary")
+
+    try:
         temp_rec = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'], vocab_text)
 
         print("Runtime vocabulary set: %s"%vocab_list)
         return temp_rec
     except:
-        raise HTTPException(status_code=400, detail="Cannot parse runtime vocabulary")
+        raise HTTPException(status_code=500, detail="Cannot set runtime vocabulary")
+    
         
 
 def do_transcribe(model_id, input, runtime_vocab=None):
@@ -313,6 +319,8 @@ async def load_models(config_path):
                 global stt
                 import stt
                 model['type'] = 'deepspeech'
+                model['vocabulary'] = None
+                model['vocabulary-size'] = 0
 
                 model_path_candidates = [f for f in os.listdir(model_dir) if os.path.splitext(f)[1] in DEEPSPEECH_MODEL_EXT]
                 if len(model_path_candidates) != 1:
