@@ -121,7 +121,7 @@ docker-compose up
 
 ### Simple transcription request
 
-Transcription requests take in a mono PCM WAVE format file. Note that Deepspeech models usually require a certain sampling rate. 
+Transcription requests take in an audio file and responds with its transcription. 
 
 #### Request with cURL
 ```
@@ -180,11 +180,11 @@ curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav
 
 ### Transcription request with runtime vocabulary
 
-You can restrict the model to recognize certain words during requests. To do that, enter the list of words you want to restrict to using the request field `vocabulary`
+You can restrict the model to recognize certain words during requests. To do that, enter the list of words you want to restrict to using the request field `vocabulary`.
 
 #### Request with cURL
 ```
-curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav"' -F 'lang="en"' -F 'vocabulary="[\"yes\", \"no\"]"'
+curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.mp3"' -F 'lang="en"' -F 'vocabulary="[\"yes\", \"no\"]"'
 ```
 
 #### Transcription response
