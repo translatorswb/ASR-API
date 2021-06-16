@@ -1,5 +1,14 @@
 # ASR-API
-TWB's API for serving automatic speech recognition (ASR) models. It currently serves two types of models: Kaldi and Deepspeech. 
+TWB's REST API for serving automatic speech recognition (ASR) models.
+
+Features:
+- Loads and runs multiple models in parallel
+- Supports Kaldi or DeepSpeech-based models
+- Works on CPU
+- Takes in any type of audio file
+- Model specifications through a JSON-based configuration file
+- Permanent or per-request vocabulary specification (with Kaldi-based models)
+- Word timing information (with Kaldi-based models)
 
 ## Loading models
 
