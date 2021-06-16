@@ -42,7 +42,7 @@ Model configurations are specified in a JSON file named `config.json`. An exampl
 }
 ```
 
-##### Field speficiations:
+##### Field specifications:
 
 - **`languages`**: a dictionary used for mapping language codes to language names.
 - **`models`**: a list containing specifications of models available in the system. 
