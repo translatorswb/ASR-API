@@ -5,17 +5,18 @@
             "lang": "en",
             "model_type": "vosk",
             "model_path": "vosk-model-small-en-us-0.15",
-            "load": false
+            "load": true
         },
 	    {
             "lang": "en",
             "alt": "glossary",
             "model_type": "vosk",
             "model_path": "vosk-model-en-us-aspire-0.2_glossarylm",
-            "load": false
+            "load": true
 	    },
         {
             "lang": "bn",
+	    "alt": "glossary",
             "model_type": "coqui",
             "framerate":16000,
             "model_path": "coqui-bn-glossary",
