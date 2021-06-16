@@ -2,12 +2,14 @@ from typing import List, Optional, Dict
 from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
 from pydantic import BaseModel, Field 
 from time import perf_counter
+from io import BytesIO
 import numpy as np
 import os
 import json
 import re
 import wave
 import csv
+import ffmpeg
 
 transcribe = APIRouter()
 
@@ -26,10 +28,6 @@ DEFAULT_FRAMERATE = 16000
 loaded_models = {}
 config_data = {}
 language_codes = {}
-
-#processors
-# preprocessor =  lambda x: x #string IN -> string OUT
-# postprocessor =  lambda x: x #string IN -> string OUT
 
 #ASR operations
 def get_model_id(lang, alt_id=None):
@@ -86,32 +84,6 @@ def vosk_transcriber(wf, rec):
     
     return words
 
-# def convert_samplerate(file_like, desired_sample_rate):
-#     #create empty file to copy the file_object to
-#     temp_dir = tempfile.gettempdir()
-#     local_wav_path = os.path.join(temp_dir, file_like.filename)
-#     local_wav = open(local_wav_path, 'wb+')
-#     shutil.copyfileobj(file_like.file, local_wav)
-#     local_wav.close()
-#     print(local_wav_path)
-
-#     sox_cmd = "sox {} --type raw --bits 16 --channels 1 --rate {} --encoding signed-integer --endian little --compression 0.0 --no-dither - ".format(
-#         local_wav_path, desired_sample_rate
-#     )
-#     try:
-#         output = subprocess.check_output(shlex.split(sox_cmd), stderr=subprocess.PIPE)
-#     except subprocess.CalledProcessError as e:
-#         raise RuntimeError("SoX returned non-zero status: {}".format(e.stderr))
-#     except OSError as e:
-#         raise OSError(
-#             e.errno,
-#             "SoX not found, use {}hz files or install it: {}".format(
-#                 desired_sample_rate, e.strerror
-#             ),
-#         )
-
-#     return np.frombuffer(output, np.int16)
-
 def update_voskrecognizer(model_id, framerate):
     if loaded_models[model_id]['vocabulary']:
         loaded_models[model_id]['vosk-recognizer'] = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'], loaded_models[model_id]['vocabulary'])
@@ -125,7 +97,6 @@ def make_runtime_voskrecognizer(model_id, vocabulary_json):
 
         vocab_list.append("[unk]")
         vocab_text = json.dumps(vocab_list)
-
     except:
         raise HTTPException(status_code=400, detail="Cannot parse runtime vocabulary")
 
@@ -137,27 +108,36 @@ def make_runtime_voskrecognizer(model_id, vocabulary_json):
     except:
         raise HTTPException(status_code=500, detail="Cannot set runtime vocabulary")
     
-        
+def normalize_audio(audio):
+    out, err = ffmpeg.input('pipe:0') \
+        .output('pipe:1', f='WAV', acodec='pcm_s16le', ac=1, ar='16k', loglevel='error', hide_banner=None) \
+        .run(input=audio, capture_stdout=True, capture_stderr=True)
+    if err:
+        raise Exception(err)
+    return out        
 
 def do_transcribe(model_id, input, runtime_vocab=None):
+    try:
+        audio = normalize_audio(input.file.read())
+        audio = BytesIO(audio)
+    except:
+        raise HTTPException(status_code=500, detail="Problem reading/converting audio")
+
     #Wav read
     try:
-        wf = wave.open(input.file, "rb")
-    except:
-        raise HTTPException(status_code=400, detail="Broken WAV")
-        
-    if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-        raise HTTPException(status_code=400, detail="Audio file not WAV format mono PCM.")
+        wf = wave.open(audio, "rb")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Problem reading converted WAV")
 
-    framerate = wf.getframerate()
     inference_start = perf_counter()
 
     if loaded_models[model_id]['type'] == 'vosk':
-        if framerate != loaded_models[model_id]['framerate']:
-            loaded_models[model_id]['framerate'] = framerate
-            print("Changing model %s's framerate to %i"%(model_id, framerate))
+        # framerate = wf.getframerate()
 
-            update_voskrecognizer(model_id, framerate)
+        # if framerate != loaded_models[model_id]['framerate']:
+        #     loaded_models[model_id]['framerate'] = framerate
+        #     print("Changing model %s's framerate to %i"%(model_id, framerate))
+        #     update_voskrecognizer(model_id, framerate)
 
         if runtime_vocab:
             rec = make_runtime_voskrecognizer(model_id, runtime_vocab)
@@ -171,16 +151,13 @@ def do_transcribe(model_id, input, runtime_vocab=None):
             raise HTTPException(status_code=500, detail="Problem occured with vosk transcriber")
             
     elif loaded_models[model_id]['type'] == 'deepspeech':
-        if 'framerate' in loaded_models[model_id] and loaded_models[model_id]['framerate'] != framerate:
-            raise HTTPException(status_code=400, detail="Audio file not in framerate %i"%loaded_models[model_id]['framerate'])
-        
         try:
-            audio = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
+            wfa = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
         except:
-            raise HTTPException(status_code=500, detail="Problem reading audio")
+            raise HTTPException(status_code=500, detail="Problem reading audio frames")
 
         try:
-            transcript = loaded_models[model_id]['stt-model'].stt(audio)
+            transcript = loaded_models[model_id]['stt-model'].stt(wfa)
         except:
             raise HTTPException(status_code=500, detail="Problem occured with deepspeech transcriber")
 
@@ -188,8 +165,8 @@ def do_transcribe(model_id, input, runtime_vocab=None):
 
     inference_time = perf_counter() - inference_start
 
-    #Postprocess (text)
-    #...
+    # #Postprocess (text)
+    # #...
     
     return words, transcript, inference_time
 
