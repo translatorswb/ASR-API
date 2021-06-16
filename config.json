@@ -22,7 +22,7 @@
         },
         {
             "lang": "bn",
-	    "alt": "glossary",
+            "alt": "glossary",
             "model_type": "deepspeech",
             "model_path": "coqui-bn-glossary",
             "load": true

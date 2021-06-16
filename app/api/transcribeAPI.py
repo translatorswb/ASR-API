@@ -258,8 +258,6 @@ async def load_models(config_path):
             else:
                 model['framerate'] = DEFAULT_FRAMERATE
 
-
-
             if model_config['model_type'] == 'vosk':
                 global vosk
                 import vosk
@@ -327,7 +325,6 @@ async def load_models(config_path):
             loaded_models[model_id] = model
         
     return len(loaded_models)
-
     
 #HTTP operations
 class TranscriptionResponse(BaseModel):
