@@ -132,13 +132,6 @@ def do_transcribe(model_id, input, runtime_vocab=None):
     inference_start = perf_counter()
 
     if loaded_models[model_id]['type'] == 'vosk':
-        # framerate = wf.getframerate()
-
-        # if framerate != loaded_models[model_id]['framerate']:
-        #     loaded_models[model_id]['framerate'] = framerate
-        #     print("Changing model %s's framerate to %i"%(model_id, framerate))
-        #     update_voskrecognizer(model_id, framerate)
-
         if runtime_vocab:
             rec = make_runtime_voskrecognizer(model_id, runtime_vocab)
         else:
