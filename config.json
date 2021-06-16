@@ -23,10 +23,7 @@
         {
             "lang": "bn",
 	    "alt": "glossary",
-            "model_type": "coqui",
-            "alt": "glossary",
             "model_type": "deepspeech",
-            "framerate":16000,
             "model_path": "coqui-bn-glossary",
             "load": true
         }
