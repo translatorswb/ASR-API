@@ -55,7 +55,7 @@ Model configurations are specified in a JSON file named `config.json`. An exampl
 
 ##### Vocabulary restriction
 
-If your application works in a restricted domain, you can specify a vocabulary file. To do that, make a text file containing all the words that you can possibly recognize line by line, place it under `vocabularies` folder and speficy the filename using `vocabulary` field in the model specification. 
+If your application works in a restricted domain, you can specify a vocabulary file. To do that, make a text file containing all the words that you can possibly recognize line by line, place it under `vocabularies` folder and speficy the filename using `vocabulary` field in the model specification. (This feature works only for kaldi-based models)
 
 ### Example model configuration and vocabulary for recognizing English digits
 
@@ -189,7 +189,7 @@ curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav
 
 ### Transcription request with runtime vocabulary
 
-You can restrict the model to recognize certain words during requests. To do that, enter the list of words you want to restrict to using the request field `vocabulary`.
+You can restrict the model to recognize certain words during requests. To do that, enter the list of words you want to restrict to using the request field `vocabulary`. (This feature works only for kaldi-based models)
 
 #### Request with cURL
 ```
