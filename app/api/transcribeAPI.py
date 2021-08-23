@@ -21,7 +21,7 @@ MOSES_TOKENIZER_DEFAULT_LANG = 'en'
 SUPPORTED_MODEL_TYPES = ['vosk', 'deepspeech']
 MODEL_TAG_SEPARATOR = "-"
 DEEPSPEECH_SCORER_EXT = '.scorer'
-DEEPSPEECH_MODEL_EXT = ['.pb', '.pbmm']
+DEEPSPEECH_MODEL_EXT = ['.tflite']
 DEFAULT_FRAMERATE = 16000
 
 #models and data
@@ -292,7 +292,7 @@ async def load_models(config_path):
 
                 model_path_candidates = [f for f in os.listdir(model_dir) if os.path.splitext(f)[1] in DEEPSPEECH_MODEL_EXT]
                 if len(model_path_candidates) != 1:
-                    print("\nERROR: Can't find a unique model with extension .pb or .pbmm under model directory %s"%(model_dir))
+                    print("\nERROR: Can't find a unique model with extension .tflite under model directory %s"%(model_dir))
                     continue
 
                 model_path = os.path.join(model_dir, model_path_candidates[0])
@@ -309,7 +309,7 @@ async def load_models(config_path):
                     model['stt-model'].enableExternalScorer(scorer_path)
                     print("with scorer", end=" ")
                 else:
-                    print("\nWARNING: More than one scorer under model directory", model_dir)
+                    print("\nWARNING: More than one scorer under model directory. Loading without scorer.", model_dir)
 
             else:
                 print("\nERROR: Unknown model type", model_config['model_type'])

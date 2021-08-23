@@ -1,5 +1,5 @@
 {
-    "languages":{"en":"English", "bn":"Bengali"},
+    "languages":{"en":"English", "bn":"Bengali", "swc":"Swahili (Congo)"},
     "models": [
         {
             "lang": "en",
@@ -31,6 +31,13 @@
             "alt": "glossary",
             "model_type": "deepspeech",
             "model_path": "coqui-bn-glossary",
+            "load": true
+        },
+        {
+            "lang": "swc",
+            "alt": "commands",
+            "model_type": "deepspeech",
+            "model_path": "swc-commands",
             "load": true
         }
 
