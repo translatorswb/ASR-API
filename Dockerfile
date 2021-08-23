@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM python:3.7-bullseye
 
 WORKDIR /app
 
@@ -8,8 +8,6 @@ RUN apt-get update && apt-get clean
 
 # Install ffmpeg
 RUN apt-get install --no-install-recommends -y ffmpeg
-
-RUN apt-get install -y python3-pip
 
 RUN pip install -r /app/requirements.txt \
     && rm -rf /root/.cache/pip
