@@ -22,6 +22,7 @@ SUPPORTED_MODEL_TYPES = ['vosk', 'deepspeech']
 MODEL_TAG_SEPARATOR = "-"
 DEEPSPEECH_SCORER_EXT = '.scorer'
 DEEPSPEECH_MODEL_EXT = ['.tflite']
+SCORER_DEFAULT_ID = 'default'
 DEFAULT_FRAMERATE = 16000
 
 #models and data
@@ -116,7 +117,7 @@ def normalize_audio(audio):
         raise Exception(err)
     return out        
 
-def do_transcribe(model_id, input, runtime_vocab=None):
+def do_transcribe(model_id, input, runtime_vocab=None, scorer_id=None):
     try:
         audio = normalize_audio(input.file.read())
         audio = BytesIO(audio)
@@ -144,6 +145,22 @@ def do_transcribe(model_id, input, runtime_vocab=None):
             raise HTTPException(status_code=500, detail="Problem occured with vosk transcriber")
             
     elif loaded_models[model_id]['type'] == 'deepspeech':
+        # if scorer_id:
+        if scorer_id in loaded_models[model_id]['scorer-dict']:
+            if not scorer_id == loaded_models[model_id]['active-scorer']:
+                print("Loading scorer:", scorer_id)
+                loaded_models[model_id]['stt-model'].enableExternalScorer(loaded_models[model_id]['scorer-dict'][scorer_id])
+                loaded_models[model_id]['active-scorer'] = scorer_id
+        elif scorer_id == None:
+            #Drop loaded language model if there is
+            if not scorer_id == loaded_models[model_id]['active-scorer']:
+                print("Disabling scorer")
+                loaded_models[model_id]['stt-model'].disableExternalScorer()
+                loaded_models[model_id]['active-scorer'] = scorer_id
+        else:
+            raise HTTPException(status_code=500, detail="Model %s does not support a scorer with id %s"%(model_id, scorer_id))
+        
+        print("Scorer:", loaded_models[model_id]['active-scorer'])
         try:
             wfa = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
         except:
@@ -249,7 +266,7 @@ async def load_models(config_path):
                 print("WARNING: Overwriting model %s. Make sure you give an 'alt' ids to load alternate models for same language."%model_id)
 
             #Load model pipeline
-            print("Model: %s ("%model_id, end=" ")
+            print("Model: %s ("%model_id, end="")
             
             print("ASR", end="")
 
@@ -299,23 +316,37 @@ async def load_models(config_path):
 
                 model['stt-model'] = stt.Model(model_path)
 
-                print("-deepspeech", end=" ") 
+                print("-deepspeech)", end=" ") 
 
-                scorer_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(DEEPSPEECH_SCORER_EXT)]
-                if len(scorer_path_candidates) == 0:
-                    print("without scorer", end=" ")
-                elif len(scorer_path_candidates) == 1:
-                    scorer_path = os.path.join(model_dir, scorer_path_candidates[0])
-                    model['stt-model'].enableExternalScorer(scorer_path)
-                    print("with scorer", end=" ")
-                else:
-                    print("\nWARNING: More than one scorer under model directory. Loading without scorer.", model_dir)
+                model['active-scorer'] = None
+                model['scorer-dict'] = {}
+                if "scorers" in model_config:
+                    for scorer_id, scorer_filename in model_config["scorers"].items():
+                        scorer_path = os.path.join(model_dir, scorer_filename)
+                        model['scorer-dict'][scorer_id] = scorer_path
+                        if scorer_id == SCORER_DEFAULT_ID:
+                            model['stt-model'].enableExternalScorer(scorer_path)
+                            model['active-scorer'] = scorer_id
+                
+
+                print("Scorers: %i (%s)"%(len(model['scorer-dict']), list(model['scorer-dict'].keys())), end=" ")
+                print("Active: %s"%model['active-scorer'])
+
+                # scorer_path_candidates = [f for f in os.listdir(model_dir) if f.endswith(DEEPSPEECH_SCORER_EXT)]
+                # if len(scorer_path_candidates) == 0:
+                #     print("without scorer", end=" ")
+                # elif len(scorer_path_candidates) == 1:
+                #     scorer_path = os.path.join(model_dir, scorer_path_candidates[0])
+                #     model['stt-model'].enableExternalScorer(scorer_path)
+                #     print("with scorer", end=" ")
+                # else:
+                #     print("\nWARNING: More than one scorer under model directory. Loading without scorer.", model_dir)
 
             else:
                 print("\nERROR: Unknown model type", model_config['model_type'])
                 continue
 
-            print(")")
+            
 
             print("Framerate: %i"%model['framerate'])
             if model['vocabulary']:
@@ -340,8 +371,9 @@ class LanguagesResponse(BaseModel):
     languages: Dict
 
 @transcribe.post('/short', status_code=200)
-async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None), word_times:Optional[bool] = Form(False), vocabulary:Optional[str] = Form(None)) :
+async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(...), alt: Optional[str] = Form(None), word_times:Optional[bool] = Form(False), vocabulary:Optional[str] = Form(None), scorer:Optional[str] = Form(None)) :
     model_id = get_model_id(lang, alt) 
+    print("Request for", model_id)
     
     if not model_id in loaded_models:
         raise HTTPException(status_code=400, detail="Language %s is not supported."%model_id)
@@ -351,8 +383,17 @@ async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(
 
     if vocabulary and loaded_models[model_id]['type'] != 'vosk':
         raise HTTPException(status_code=400, detail="Model %s cannot take runtime vocabulary. Remove vocabulary specification."%model_id)
+
+    if scorer and loaded_models[model_id]['type'] != 'deepspeech':
+        raise HTTPException(status_code=400, detail="Model %s cannot be specified a scorer. Remove scorer field from request."%model_id)
+    elif not scorer and loaded_models[model_id]['type'] == 'deepspeech':
+        if SCORER_DEFAULT_ID in loaded_models[model_id]['scorer-dict']:
+            scorer = SCORER_DEFAULT_ID
+        else:
+            scorer = None
     
-    words, transcript, time = do_transcribe(model_id, file, vocabulary)
+    words, transcript, time = do_transcribe(model_id, file, vocabulary, scorer)
+    print("Result:", transcript)
 
     if word_times:
         response = FullTranscriptionResponse(words=words, transcript=transcript, time="%.3f"%time)
@@ -371,5 +412,10 @@ async def languages():
 @transcribe.on_event("startup")
 async def startup_event():
     no_models = await load_models(CONFIG_JSON_PATH)
-    print("%i models loaded successfully"%no_models)
+    if no_models == 0:
+        print("No models loaded")
+    elif no_models == 1:
+        print("1 model loaded successfully")
+    else:
+        print("%i models loaded successfully"%no_models)
 

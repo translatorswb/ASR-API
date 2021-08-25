@@ -5,14 +5,14 @@
             "lang": "en",
             "model_type": "vosk",
             "model_path": "vosk-model-small-en-us-0.15",
-            "load": true
+            "load": false
         },
 	    {
             "lang": "en",
             "alt": "glossary",
             "model_type": "vosk",
             "model_path": "vosk-model-en-us-aspire-0.2_glossarylm",
-            "load": true
+            "load": false
 	    },
         {
             "lang": "fr",
@@ -24,20 +24,20 @@
             "lang": "bn",
             "model_type": "deepspeech",
             "model_path": "coqui-bn",
-            "load": true
-        },
-        {
-            "lang": "bn",
-            "alt": "glossary",
-            "model_type": "deepspeech",
-            "model_path": "coqui-bn-glossary",
+            "scorers": {
+                "default":"general-bn.scorer",
+                "glossary":"glossary-bn.scorer"
+            },
             "load": true
         },
         {
             "lang": "swc",
-            "alt": "commands",
             "model_type": "deepspeech",
-            "model_path": "swc-commands",
+            "model_path": "coqui-swc",
+            "scorers": {
+                "default":"swc-general.scorer",
+                "commands":"swc-numbers-yesno.scorer"
+            },
             "load": true
         }
 
