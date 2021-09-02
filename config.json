@@ -5,14 +5,14 @@
             "lang": "en",
             "model_type": "vosk",
             "model_path": "vosk-model-small-en-us-0.15",
-            "load": false
+            "load": true
         },
 	    {
             "lang": "en",
             "alt": "glossary",
             "model_type": "vosk",
             "model_path": "vosk-model-en-us-aspire-0.2_glossarylm",
-            "load": false
+            "load": true
 	    },
         {
             "lang": "fr",
@@ -36,6 +36,7 @@
             "model_path": "coqui-swc",
             "scorers": {
                 "default":"swc-general.scorer",
+                "only-swc":"swc-general-only-swc.scorer",
                 "commands":"swc-numbers-yesno.scorer"
             },
             "load": true

@@ -299,6 +299,8 @@ async def load_models(config_path):
                     model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'], model['vocabulary'])
                 else:
                     model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'])
+
+                model['scorer-dict'] = {}
                 print("-vosk", end=" ") 
             elif model_config['model_type'] == 'deepspeech':
                 global stt
@@ -405,7 +407,7 @@ async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(
 
 @transcribe.get('/', status_code=200)
 async def languages():
-    languages = {lang_code:loaded_models[lang_code]['lang-name'] for lang_code in loaded_models}
+    languages = {lang_code:{'name':loaded_models[lang_code]['lang-name'], 'scorers': list(loaded_models[lang_code]['scorer-dict'].keys())} for lang_code in loaded_models}
     return LanguagesResponse(languages=languages)
 
 
