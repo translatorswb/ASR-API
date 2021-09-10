@@ -9,7 +9,7 @@ Features:
 - Model specifications through a JSON-based configuration file
 - Permanent or per-request vocabulary specification (with Kaldi-based models)
 - Word timing information (with Kaldi-based models)
-- (NEW) Per-request language model selection (with Deepspeech-based models)
+- **(NEW)** Per-request language model selection (with Deepspeech-based models)
 
 ## Loading models
 
