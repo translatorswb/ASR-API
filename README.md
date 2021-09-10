@@ -23,6 +23,37 @@ Features:
 1) Place the model you want into a folder under `models` directory
 2) Specify it in the configuration file. 
 
+#### Example model directory
+
+```
+models
+└── my-kaldi-model
+    ├── README
+    ├── am
+    │   └── final.mdl
+    ├── conf
+    │   ├── mfcc.conf
+    │   └── model.conf
+    ├── graph
+    │   ├── Gr.fst
+    │   ├── HCLr.fst
+    │   ├── disambig_tid.int
+    │   └── phones
+    │       └── word_boundary.int
+    └── ivector
+        ├── final.dubm
+        ├── final.ie
+        ├── final.mat
+        ├── global_cmvn.stats
+        ├── online_cmvn.conf
+        └── splice.conf
+└── my-deepspeech-model
+    ├── general.scorer
+    ├── yes-no.scorer
+    ├── digits.scorer
+    └── my-deepspeech-model.tflite
+```
+
 #### Configuration file
 
 Model configurations are specified in a JSON file named `config.json`. An example configuration file looks like this:
