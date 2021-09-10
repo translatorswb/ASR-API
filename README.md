@@ -9,13 +9,14 @@ Features:
 - Model specifications through a JSON-based configuration file
 - Permanent or per-request vocabulary specification (with Kaldi-based models)
 - Word timing information (with Kaldi-based models)
+- (NEW) Per-request language model selection (with Deepspeech-based models)
 
 ## Loading models
 
 ### Where to get ASR models?
 
 - **Kaldi-based** models can be found at [Alpha Cepei's website](https://alphacephei.com/vosk/models). 
-- **Deepspeech-based** models can be found at [Coqui's website](https://coqui.ai/models/).
+- **Deepspeech-based** models can be found at [Coqui's model zoo](https://coqui.ai/models/).
 
 ### How to integrate models?
 
@@ -32,10 +33,14 @@ Model configurations are specified in a JSON file named `config.json`. An exampl
     "models": [
         {
             "lang": "<lang-code>",
-            "alt": "<optional-alternative-tag>"
+            "alt": "<optional alternative tag>"
             "model_type": "<vosk or deepspeech>",
-            "model_path": "<model-directory>",
-            "vocabulary": "<vocabulary-file-path>",
+            "model_path": "<model directory>",
+            "vocabulary": "<vocabulary file path only for vosk type models>",
+            "scorers": {
+                "default": "<default scorer path only for deepspeech type models",
+                "<scorer-id>": "<alternative scorer path only for deepspeech type models",
+            }
             "load": <true or false for loading at runtime>
         }
      }
@@ -51,11 +56,18 @@ Model configurations are specified in a JSON file named `config.json`. An exampl
 - **`model_type`**: type of model. 'vosk' if Kaldi-based 'deepspeech' if Deepspeech based.
 - **`model_path`**: directory where the model files are stored. This directory should be put under `models` directory. 
 - **`vocabulary`**: an optional text file containing words that the ASR will be conditioned to recognize (_works only with vosk type models_)
+- **`scorers`**: dictionary of scorer id's and their paths inside the model directory (_works only with deepspeech type models_)
 - **`load`**: if set to false, model will be skipped during loading
 
-##### Vocabulary restriction
+##### Vocabulary restriction (kaldi-based model)
 
 If your application works in a restricted domain, you can specify a vocabulary file. To do that, make a text file containing all the words that you can possibly recognize line by line, place it under `vocabularies` folder and speficy the filename using `vocabulary` field in the model specification. (This feature works only for kaldi-based models)
+
+##### Alternative language model selection (deepspeech-based model)
+
+Speech recognition is conditioned by what's called a language model. You can improve recognition accuracy by optimizing your language model to your task. For example if you need to recognize digits, it's better you use a language model that's trained only on text containing digits. 
+
+ASR-API allows using the same deepspeech-based acoustic model with multiple language models. To do that, just place them in the model directory and specify their ids and paths under the `scorers` dictionary. 
 
 ### Example model configuration and vocabulary for recognizing English digits
 
@@ -187,7 +199,7 @@ curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.wav
 }
 ```
 
-### Transcription request with runtime vocabulary
+### Transcription request with runtime vocabulary (kaldi-based)
 
 You can restrict the model to recognize certain words during requests. To do that, enter the list of words you want to restrict to using the request field `vocabulary`. (This feature works only for kaldi-based models)
 
@@ -198,10 +210,30 @@ curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.mp3
 
 #### Transcription response
 
+```
 {
     "transcript": "yes",
     "time": 0.152
 }
+```
+
+### Transcription request with runtime language model selection (deepspeech-based)
+
+You can specify which language model (scorer) to use on request for deepspeech-based models. To do that, specify the scorer id you used in the configuration file with `scorer` field. If no scorer is specified on request, the scorer with `default` id will be selected. If there's no scorer with `default` id, model will be run without a language model.
+
+#### Request with cURL
+```
+curl -L -X POST 'http://localhost:8010/transcribe/short' -F 'file=@"my_audio.mp3"' -F 'lang="en"' -F 'scorer="digits"'
+```
+
+#### Transcription response
+
+```
+{
+    "transcript": "one",
+    "time": 0.121
+}
+```
 
 ### Retrieve languages
 
@@ -218,8 +250,21 @@ curl -L -X GET 'http://localhost:8010/transcribe'
 ```
 {
     "languages": {
-        "en": "English",
-        "en-digits": "English (digits)"
+         "en": {
+            "name": "English",
+            "scorers": []
+        },
+        "en-digits": {
+            "name": "English (digits)",
+            "scorers": []
+        },
+        "bn": {
+            "name": "Bengali",
+            "scorers": [
+                "default",
+                "glossary"
+            ]
+        }
     }
 }
 ```
