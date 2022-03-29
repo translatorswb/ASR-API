@@ -77,11 +77,11 @@ def vosk_transcriber(wf, rec):
            segment_result = json.loads(rec.Result())
            
            results.append(segment_result)
-           words.extend(segment_result['result'])
+           words.extend(segment_result.get('result'))
     final_result = json.loads(rec.FinalResult())
     results.append(final_result)
     if 'result' in final_result:
-        words.extend(final_result['result'])
+        words.extend(final_result.get('result'))
     
     return words
 
