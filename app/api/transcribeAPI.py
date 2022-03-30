@@ -73,13 +73,11 @@ def vosk_transcriber(wf, rec):
        if len(data) == 0:
            break
        if rec.AcceptWaveform(data):
-           #results.append(json.loads(rec.Result()))
            segment_result = json.loads(rec.Result())
-           
-           results.append(segment_result)
-           words.extend(segment_result.get('result'))
+           if 'result' in segment_result:
+               words.extend(segment_result.get('result'))
+            
     final_result = json.loads(rec.FinalResult())
-    results.append(final_result)
     if 'result' in final_result:
         words.extend(final_result.get('result'))
     
@@ -90,7 +88,7 @@ def update_voskrecognizer(model_id, framerate):
         loaded_models[model_id]['vosk-recognizer'] = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'], loaded_models[model_id]['vocabulary'])
     else:
         loaded_models[model_id]['vosk-recognizer'] = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'])
-
+    loaded_models[model_id]['vosk-recognizer'].SetWords(True)
 
 def make_runtime_voskrecognizer(model_id, vocabulary_json):
     try:
@@ -103,7 +101,7 @@ def make_runtime_voskrecognizer(model_id, vocabulary_json):
 
     try:
         temp_rec = vosk.KaldiRecognizer(loaded_models[model_id]['stt-model'], loaded_models[model_id]['framerate'], vocab_text)
-
+        temp_rec.SetWords(True)
         print("Runtime vocabulary set: %s"%vocab_list)
         return temp_rec
     except:
@@ -121,7 +119,8 @@ def do_transcribe(model_id, input, runtime_vocab=None, scorer_id=None):
     try:
         audio = normalize_audio(input.file.read())
         audio = BytesIO(audio)
-    except:
+    except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail="Problem reading/converting audio")
 
     #Wav read
@@ -299,7 +298,7 @@ async def load_models(config_path):
                     model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'], model['vocabulary'])
                 else:
                     model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'])
-
+                model['vosk-recognizer'].SetWords(True)
                 model['scorer-dict'] = {}
                 print("-vosk", end=" ") 
             elif model_config['model_type'] == 'deepspeech':
