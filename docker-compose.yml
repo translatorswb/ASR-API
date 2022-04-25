@@ -4,13 +4,20 @@ services:
 
   asr:
     build: .
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    # command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    command: tail -F anything
     restart: unless-stopped
     ports:
       - 8010:8000
+    volumes:
+      - ./app:/app/app
+      - ./models:/app/models
+      - ./config.json:/app/config.json
     environment:
       - ASR_API_CONFIG=/app/config.json
       - MODELS_ROOT=/app/models
       - VOCABS_ROOT=/app/vocabularies
+      - SPEECH_KEY=${SPEECH_KEY}
+      - SERVICE_REGION=${SERVICE_REGION}
       # - PROXY_PREFIX=api  # Comment out in local
 

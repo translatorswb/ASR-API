@@ -1,0 +1,1 @@
+docker run -it -p 8010:8010 -v $(pwd):/app asr-api

@@ -1,7 +1,21 @@
 from fastapi import FastAPI
 import os
-from app.api.transcribeAPI import transcribe
+
+try:
+    from app.api.transcribeAPI import transcribe
+    from app.api.settings import *
+
+except:
+    from api.transcribeAPI import transcribe
+    from api.settings import *
+
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+
+import uvicorn
+
+
 
 ROOT_PATH = '/' + os.environ.get('PROXY_PREFIX') if os.environ.get('PROXY_PREFIX') else None
 
@@ -10,6 +24,8 @@ app = FastAPI(title="Speech API",
               version="0.1", 
               root_path=ROOT_PATH, 
               redoc_url="/redoc", openapi_url="/openapi.json", docs_url="/docs")
+
+app.mount("/static", StaticFiles(directory=STATIC_FOLDER), name="static")
 
 origins = [
     "http://127.0.0.1",
@@ -25,3 +41,6 @@ app.add_middleware(
 )
 
 app.include_router(transcribe, prefix='/transcribe')
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,5 +1,6 @@
+from email.mime import audio
 from typing import List, Optional, Dict
-from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException
+from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException, Request
 from pydantic import BaseModel, Field 
 from time import perf_counter
 from io import BytesIO
@@ -10,6 +11,7 @@ import re
 import wave
 import csv
 import ffmpeg
+from .azure_speech import *
 
 transcribe = APIRouter()
 
@@ -178,6 +180,82 @@ def do_transcribe(model_id, input, runtime_vocab=None, scorer_id=None):
     # #...
     
     return words, transcript, inference_time
+
+
+
+def do_transcribev2(model_id, file, runtime_vocab=None, scorer_id=None):
+    
+    try:
+        with open(file, 'rb') as f:
+            audio = normalize_audio(f.read())
+            audio = BytesIO(audio)
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Problem reading/converting audio")
+
+    # audio = file
+
+    #Wav read
+    try:
+        wf = wave.open(audio, "rb")
+        # wf = open(file, 'rb')
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Problem reading converted WAV")
+
+    inference_start = perf_counter()
+
+    if loaded_models[model_id]['type'] == 'vosk':
+        if runtime_vocab:
+            rec = make_runtime_voskrecognizer(model_id, runtime_vocab)
+        else:
+            rec = loaded_models[model_id]['vosk-recognizer']
+
+        try:
+            words = vosk_transcriber(wf, rec)
+            transcript = " ".join([w["word"] for w in words])
+        except:
+            raise HTTPException(status_code=500, detail="Problem occured with vosk transcriber")
+            
+    elif loaded_models[model_id]['type'] == 'deepspeech':
+        # if scorer_id:
+        if scorer_id in loaded_models[model_id]['scorer-dict']:
+            if not scorer_id == loaded_models[model_id]['active-scorer']:
+                print("Loading scorer:", scorer_id)
+                loaded_models[model_id]['stt-model'].enableExternalScorer(loaded_models[model_id]['scorer-dict'][scorer_id])
+                loaded_models[model_id]['active-scorer'] = scorer_id
+        elif scorer_id == None:
+            #Drop loaded language model if there is
+            if not scorer_id == loaded_models[model_id]['active-scorer']:
+                print("Disabling scorer")
+                loaded_models[model_id]['stt-model'].disableExternalScorer()
+                loaded_models[model_id]['active-scorer'] = scorer_id
+        else:
+            raise HTTPException(status_code=500, detail="Model %s does not support a scorer with id %s"%(model_id, scorer_id))
+        
+        print("Scorer:", loaded_models[model_id]['active-scorer'])
+        try:
+            wfa = np.frombuffer(wf.readframes(wf.getnframes()), np.int16)
+        except:
+            raise HTTPException(status_code=500, detail="Problem reading audio frames")
+
+        try:
+            transcript = loaded_models[model_id]['stt-model'].stt(wfa)
+        except:
+            raise HTTPException(status_code=500, detail="Problem occured with deepspeech transcriber")
+
+        words = None #coqui stt does not support word alignment?
+
+    inference_time = perf_counter() - inference_start
+
+    # wf.close()
+
+    # #Postprocess (text)
+    # #...
+    
+    return words, transcript, inference_time
+
+
 
 async def load_models(config_path):
     #Check if config file is there and well formatted
@@ -401,8 +479,47 @@ async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(
     else:
         response = TranscriptionResponse(transcript=transcript, time="%.3f"%time)
 
+
     return response
 
+
+@transcribe.post('/stt', status_code=200)
+async def stt(request: Request):
+    data = await request.json()
+    lang = data['lang']
+    path = data['path']
+
+    alt = None
+    if 'alt' in data:
+        alt = data['alt']
+
+    model_id = get_model_id(lang, alt) 
+    print("Request for", model_id)
+
+
+    # audio_file, filename = convert_to_wav(file)
+
+    # try:
+    filename, file_extension = os.path.splitext(path.split('?')[0])
+    filename = filename.split(os.path.sep)[-1]
+    audio_file = f'{STATIC_FOLDER}/{filename}.wav'
+
+    words, transcript, time = do_transcribev2(model_id, audio_file)
+
+    
+    return {'text': transcript, 'time':time}
+
+
+
+
+@transcribe.post('/tts', status_code=200)
+async def do_text_to_speech(request: Request) :
+    data = await request.json()
+    path = data['path']
+    text = data['text']
+    lang = data['lang']
+    response = text_to_speech(path, text, lang)
+    return response
 
 @transcribe.get('/', status_code=200)
 async def languages():

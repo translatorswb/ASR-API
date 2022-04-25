@@ -1,32 +1,12 @@
 {
-    "languages":{"en":"English", "bn":"Bengali", "swc":"Swahili (Congo)"},
+    "languages":{"en":"English", "swc":"Swahili (Congo)"},
     "models": [
         {
-            "lang": "en",
-            "model_type": "vosk",
-            "model_path": "vosk-model-small-en-us-0.15",
-            "load": true
-        },
-	    {
-            "lang": "en",
-            "alt": "glossary",
-            "model_type": "vosk",
-            "model_path": "vosk-model-en-us-aspire-0.2_glossarylm",
-            "load": true
-	    },
-        {
-            "lang": "fr",
-            "model_type": "vosk",
-            "model_path": "vosk-model-fr-0.6-linto-2.2.0",
-            "load": false
-        },
-        {
-            "lang": "bn",
+            "lang": "eng",
             "model_type": "deepspeech",
-            "model_path": "coqui-bn",
+            "model_path": "coqui-eng",
             "scorers": {
-                "default":"general-bn.scorer",
-                "glossary":"glossary-bn.scorer"
+                "default":"coqui-stt-0.9.3-models.scorer"
             },
             "load": true
         },
@@ -34,11 +14,7 @@
             "lang": "swc",
             "model_type": "deepspeech",
             "model_path": "coqui-swc",
-            "scorers": {
-                "default":"swc-general.scorer",
-                "only-swc":"swc-general-only-swc.scorer",
-                "commands":"swc-numbers-yesno.scorer"
-            },
+            
             "load": true
         }
 
