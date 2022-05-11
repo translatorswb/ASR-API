@@ -1,3 +1,4 @@
+from cgitb import text
 from email.mime import audio
 from typing import List, Optional, Dict
 from fastapi import File, FastAPI, APIRouter, UploadFile, Form, HTTPException, Request
@@ -12,6 +13,7 @@ import wave
 import csv
 import ffmpeg
 from .azure_speech import *
+from .lang_wrapper import *
 
 transcribe = APIRouter()
 
@@ -183,7 +185,9 @@ def do_transcribe(model_id, input, runtime_vocab=None, scorer_id=None):
 
 
 
+
 def do_transcribev2(model_id, file, runtime_vocab=None, scorer_id=None):
+    
     
     try:
         with open(file, 'rb') as f:
@@ -252,6 +256,11 @@ def do_transcribev2(model_id, file, runtime_vocab=None, scorer_id=None):
 
     # #Postprocess (text)
     # #...
+
+
+    lang = chooser(transcript)
+
+    
     
     return words, transcript, inference_time
 
@@ -483,6 +492,37 @@ async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(
     return response
 
 
+# @transcribe.post('/stt', status_code=200)
+# async def stt(request: Request):
+#     data = await request.json()
+#     lang = data['lang']
+#     path = data['path']
+
+#     alt = None
+#     if 'alt' in data:
+#         alt = data['alt']
+
+#     model_id = get_model_id(lang, alt) 
+#     print("Request for", model_id)
+
+
+#     audio_file, filename = convert_to_wav(path)
+
+#     if audio_file is None:
+#         return {'text': None, 'file':None}
+
+    
+
+#     words, transcript, time = do_transcribev2(model_id, audio_file)
+
+#     print('text ===', transcript)
+#     print('filename ===', filename)
+
+    
+#     return {'text': transcript, 'file':filename}
+
+
+
 @transcribe.post('/stt', status_code=200)
 async def stt(request: Request):
     data = await request.json()
@@ -497,17 +537,25 @@ async def stt(request: Request):
     print("Request for", model_id)
 
 
-    # audio_file, filename = convert_to_wav(file)
+    audio_file, filename = convert_to_wav(path)
 
-    # try:
-    filename, file_extension = os.path.splitext(path.split('?')[0])
-    filename = filename.split(os.path.sep)[-1]
-    audio_file = f'{STATIC_FOLDER}/{filename}.wav'
-
-    words, transcript, time = do_transcribev2(model_id, audio_file)
+    if audio_file is None:
+        return {'text': None, 'file':None}
 
     
-    return {'text': transcript, 'time':time}
+
+    transcript = speech_to_text(audio_file, lang='eng')
+
+    lang = chooser_spacy(transcript)
+
+
+    transcript = speech_to_text(audio_file, lang=lang)
+
+    print('text ===', transcript)
+    print('filename ===', filename)
+
+    
+    return {'text': transcript, 'file':filename, 'lang': lang}
 
 
 

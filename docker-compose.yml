@@ -11,6 +11,7 @@ services:
       - 8010:8000
     volumes:
       - ./app:/app/app
+      - ./app/api:/app/app/api
       - ./models:/app/models
       - ./config.json:/app/config.json
     environment:

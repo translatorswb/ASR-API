@@ -17,6 +17,9 @@ def convert_to_wav(path):
     filename = filename.split(os.path.sep)[-1]
     audio_file = f'{STATIC_FOLDER}/{filename}.wav'
 
+    if os.path.exists(audio_file):
+        return None, None
+
     audioclip = AudioFileClip(path)
     audioclip.write_audiofile(audio_file)
     return audio_file, f"{filename}.wav"
@@ -24,16 +27,21 @@ def convert_to_wav(path):
     #     return False
 
 
-def speech_to_text(path):
-    audio_file, filename = convert_to_wav(path)
+def speech_to_text(path, lang):
+    # audio_file, filename = convert_to_wav(path)
 
     # import pdb; pdb.set_trace()
+    langs_map = {
+        'swh': 'sw-KE',
+        'eng': 'en-KE'
+    }
 
+    audio_file = path
     if audio_file:
         audio_config = speechsdk.audio.AudioConfig(filename=audio_file)
 
         # Creates a recognizer with the given settings
-        speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+        speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config,language=langs_map[lang] ,audio_config=audio_config)
 
 
         # Starts speech recognition, and returns after a single utterance is recognized. The end of a
@@ -47,41 +55,21 @@ def speech_to_text(path):
         # Checks result.
         if result.reason == speechsdk.ResultReason.RecognizedSpeech:
             print("Recognized: {}".format(result.text))
-            response = {
-                "message":"recognized",
-                "text": result.text,
-                "file": filename,
-                "status": 200
-            }
+            return result.text
         elif result.reason == speechsdk.ResultReason.NoMatch:
             print("No speech could be recognized: {}".format(result.no_match_details))
-            response = {
-                "message":result.no_match_details,
-                "text": "",
-                "file": "",
-                "status": 400
-            }
+            return result.no_match_details
         elif result.reason == speechsdk.ResultReason.Canceled:
             cancellation_details = result.cancellation_details
             print("Speech Recognition canceled: {}".format(cancellation_details.reason))
             if cancellation_details.reason == speechsdk.CancellationReason.Error:
                 print("Error details: {}".format(cancellation_details.error_details))
 
-            response = {
-                "message":cancellation_details.reason,
-                "text": "",
-                "file": "",
-                "status": 400
-            }
+            return cancellation_details.error_details
 
-        return response
     
 
-    response = {
-        "message":"something wrong",
-        "text": "",
-        "status": 400
-    }
+    
     return None
 
         
@@ -89,6 +77,12 @@ def speech_to_text(path):
 
 
 def text_to_speech(path,text,lang):
+
+    langs_map = {
+        'swh': 'sw-KE',
+        'eng': 'en-KE'
+    }
+
     filename, file_extension = os.path.splitext(path)
     output_file = f"{filename}_response.wav"
     audio_file = f'{STATIC_FOLDER}/{output_file}'
