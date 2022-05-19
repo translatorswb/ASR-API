@@ -545,11 +545,9 @@ async def stt(request: Request):
     
 
     transcript = speech_to_text(audio_file, lang='eng')
-
     lang = chooser_spacy(transcript)
-
-
-    transcript = speech_to_text(audio_file, lang=lang)
+    if not lang == 'eng':
+        transcript = speech_to_text(audio_file, lang=lang)
 
     print('text ===', transcript)
     print('filename ===', filename)
@@ -563,10 +561,13 @@ async def stt(request: Request):
 @transcribe.post('/tts', status_code=200)
 async def do_text_to_speech(request: Request) :
     data = await request.json()
-    path = data['path']
     text = data['text']
     lang = data['lang']
-    response = text_to_speech(path, text, lang)
+    mid = data['mid']
+    action_name = data['action_name']
+
+
+    response = text_to_speech(text, lang, mid, action_name)
     return response
 
 @transcribe.get('/', status_code=200)
