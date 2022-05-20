@@ -1,3 +1,4 @@
+from asyncio.log import logger
 import requests, os
 from .settings import *
 from datetime import datetime
@@ -31,10 +32,20 @@ def convert_to_wav(path):
     #     return False
 
 
-def speech_to_text(path, lang):
+def speech_to_text(path, lang, mid):
     # audio_file, filename = convert_to_wav(path)
 
     # import pdb; pdb.set_trace()
+    csv_file = '/app/app/transactions_stt.csv'
+
+    df = pd.read_csv(csv_file)
+
+
+    if mid in df['mid'].values:
+        print('Transcription already exists')
+        return df[df['mid'] == mid]['text'].values[0]
+
+
     langs_map = {
         'swh': 'sw-KE',
         'eng': 'en-KE'
@@ -59,6 +70,11 @@ def speech_to_text(path, lang):
         # Checks result.
         if result.reason == speechsdk.ResultReason.RecognizedSpeech:
             print("Recognized: {}".format(result.text))
+
+            df = df.append({'mid':mid, 'text':result.text}, ignore_index=True)
+
+            df.to_csv(csv_file, index=False)
+
             return result.text
         elif result.reason == speechsdk.ResultReason.NoMatch:
             print("No speech could be recognized: {}".format(result.no_match_details))
@@ -71,7 +87,6 @@ def speech_to_text(path, lang):
 
             return cancellation_details.error_details
 
-    
 
     
     return None
@@ -104,12 +119,14 @@ def text_to_speech(text, lang, mid, action_name):
     df = pd.read_csv(csv_file)
 
 
-    if mid in df['mid'].values and filename in df["filename"].values:
-        print('INFO:   duplicate_message')
-        return {
-            "message":"duplicate_message",
-            "status": 400
-        }
+    if mid in df['mid'].values:
+        print('\n\n\n\n',df[df['mid'] == mid]['filename'])
+        if filename in df[df['mid'] == mid]['filename'].values:
+            print('INFO:   duplicate_message')
+            return {
+                "message":"duplicate_message",
+                "status": 400
+            }
 
 
     df = df.append({'mid':mid, 'filename':filename}, ignore_index=True)

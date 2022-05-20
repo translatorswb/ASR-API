@@ -528,6 +528,7 @@ async def stt(request: Request):
     data = await request.json()
     lang = data['lang']
     path = data['path']
+    mid = data['mid']
 
     alt = None
     if 'alt' in data:
@@ -544,10 +545,16 @@ async def stt(request: Request):
 
     
 
-    transcript = speech_to_text(audio_file, lang='eng')
-    lang = chooser_spacy(transcript)
-    if not lang == 'eng':
-        transcript = speech_to_text(audio_file, lang=lang)
+    
+
+    try:
+        transcript = speech_to_text(audio_file, lang='eng', mid=mid)
+        lang = chooser_spacy(transcript)
+        if not lang == 'eng':
+            transcript = speech_to_text(audio_file, lang=lang, mid=mid)
+    except Exception as e:
+        transcript = str(e)
+    
 
     print('text ===', transcript)
     print('filename ===', filename)
