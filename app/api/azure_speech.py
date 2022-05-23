@@ -5,7 +5,7 @@ from datetime import datetime
 import azure.cognitiveservices.speech as speechsdk
 from moviepy.editor import *
 import random, pdb
-import emoji
+import emoji, re
 import pandas as pd
 
 # Creates an instance of a speech config with specified subscription key and service region.
@@ -13,8 +13,13 @@ import pandas as pd
 speech_config = speechsdk.SpeechConfig(subscription=SPEECH_KEY, region=SERVICE_REGION)
 
 
-def strip_emojis(text) :
-    return ''.join(c for c in text if c not in emoji.UNICODE_EMOJI)
+# def strip_emojis(text) :
+#     return ''.join(c for c in text if c not in emoji.UNICODE_EMOJI)
+
+
+def strip_emojis(text):
+    new_text = re.sub(emoji.get_emoji_regexp(), r"", text)
+    return new_text
 
 def convert_to_wav(path):
     # try:

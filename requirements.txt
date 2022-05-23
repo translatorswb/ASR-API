@@ -70,6 +70,6 @@ uvicorn==0.13.4
 vosk==0.3.21
 wasabi==0.9.1
 zipp==3.8.0
-emoji
+emoji==1.6.3
 pandas
 

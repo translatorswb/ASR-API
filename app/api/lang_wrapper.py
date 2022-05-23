@@ -62,6 +62,10 @@ def chooser_spacy(message):
     if score < 0.95:
         detected_lang = 'swh'
 
+    else:
+        if doc._.language['language'] == 'sw':
+            detected_lang = 'swh'
+
 
     print('detected_lang ==================', detected_lang)
 

@@ -557,7 +557,7 @@ async def stt(request: Request):
     
 
     print('text ===', transcript)
-    print('filename ===', filename)
+    print('lang ===', lang)
 
     
     return {'text': transcript, 'file':filename, 'lang': lang}
