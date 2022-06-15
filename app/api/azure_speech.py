@@ -7,6 +7,9 @@ from moviepy.editor import *
 import random, pdb
 import emoji, re
 import pandas as pd
+from .lang_wrapper import chooser_spacy, chooser_nlu
+
+
 
 # Creates an instance of a speech config with specified subscription key and service region.
 # Replace with your own subscription key and service region (e.g., "westus").
@@ -76,7 +79,7 @@ def speech_to_text(path, lang, mid):
         if result.reason == speechsdk.ResultReason.RecognizedSpeech:
             print("Recognized: {}".format(result.text))
 
-            df = df.append({'mid':mid, 'text':result.text}, ignore_index=True)
+            df = df.append({'mid':mid, 'text':result.text, 'filename': audio_file}, ignore_index=True)
 
             df.to_csv(csv_file, index=False)
 
@@ -113,7 +116,17 @@ def text_to_speech(text, lang, mid, action_name):
 
     text = strip_emojis(text)
 
+    print('Utterance ID:', action_name)
+
+    print('Utterance Text:', text)
+
+    print('Language:', lang)
+
     # utterance_name = abs(hash(text))
+
+    if lang == 'swh':
+        lang = chooser_nlu(text)
+        print('Detected Lang:', lang)
 
     utterance_name = action_name
 
@@ -125,7 +138,6 @@ def text_to_speech(text, lang, mid, action_name):
 
 
     if mid in df['mid'].values:
-        print('\n\n\n\n',df[df['mid'] == mid]['filename'])
         if filename in df[df['mid'] == mid]['filename'].values:
             print('INFO:   duplicate_message')
             return {

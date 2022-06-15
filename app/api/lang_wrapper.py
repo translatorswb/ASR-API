@@ -1,9 +1,24 @@
 
 import joblib
-import re, pdb
+import re, pdb, os
 import spacy
 from spacy_langdetect import LanguageDetector
 from spacy.language import Language
+
+from rasa.nlu.model import Metadata, Interpreter
+import tarfile
+
+model_folder = "/app/models/nlu-lang-classify"
+
+if not os.path.exists(model_folder):
+
+    model_tar = "/app/models/nlu-lang-classify-v2.tar.gz"
+
+    file = tarfile.open(model_tar)
+    file.extractall(model_folder)
+    file.close()
+
+interpreter = Interpreter.load(f'{model_folder}/nlu')
     
 
 
@@ -73,3 +88,26 @@ def chooser_spacy(message):
 
 
 
+def chooser_nlu(message):
+
+
+    # lang_set = connect(sender_id)
+    dict_resp = interpreter.parse(message)
+    
+    # url = 'http://localhost:5059/model/parse'
+    # myobj = {'text': message}
+
+    # x = requests.post(url, data = json.dumps(myobj))
+    # dict_resp = json.loads(x.text)
+    
+    lang_detected = dict_resp['intent']['name']
+
+    if (lang_detected == 'lang_swahili'): 
+        detected_lang = 'swh'
+    if (lang_detected == 'lang_english'):
+        detected_lang = 'eng'
+    
+    print('detected language', detected_lang)
+
+
+    return detected_lang
