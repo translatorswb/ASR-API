@@ -298,7 +298,7 @@ async def load_models(config_path):
                     model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'], model['vocabulary'])
                 else:
                     model['vosk-recognizer'] = vosk.KaldiRecognizer(model['stt-model'], model['framerate'])
-                model['vosk-recognizer'].SetWords(True)
+                #model['vosk-recognizer'].SetWords(True)
                 model['scorer-dict'] = {}
                 print("-vosk", end=" ") 
             elif model_config['model_type'] == 'deepspeech':
@@ -403,6 +403,23 @@ async def transcribe_short_audio(lang: str = Form(...), file: UploadFile = File(
 
     return response
 
+@transcribe.post('/plain/{lang}', status_code=200)
+@transcribe.post('/plain/{lang}/{alt}', status_code=200)
+async def tiles_transcribe(lang: str, file: UploadFile = File(...), alt: str = None) :
+#TODO: Needs to be synchronized with https://rhasspy.readthedocs.io/en/latest/speech-to-text/#remote-http-server   
+    
+    #import pdb; pdb.set_trace()
+    
+    model_id = get_model_id(lang, alt) 
+    print("Request for", model_id)
+    
+    if not model_id in loaded_models:
+        raise HTTPException(status_code=400, detail="Language %s is not supported."%model_id)
+
+    words, transcript, time = do_transcribe(model_id, file)
+    print("Result:", transcript)
+
+    return transcript
 
 @transcribe.get('/', status_code=200)
 async def languages():

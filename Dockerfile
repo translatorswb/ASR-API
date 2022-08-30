@@ -9,6 +9,8 @@ RUN apt-get update && apt-get clean
 # Install ffmpeg
 RUN apt-get install --no-install-recommends -y ffmpeg
 
+RUN pip install --upgrade pip
+
 RUN pip install -r /app/requirements.txt \
     && rm -rf /root/.cache/pip
 

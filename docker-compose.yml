@@ -13,4 +13,11 @@ services:
       - MODELS_ROOT=/app/models
       - VOCABS_ROOT=/app/vocabularies
       # - PROXY_PREFIX=api  # Comment out in local
+    container_name: asrapi
+    networks:
+      - api-network
+      
+networks:
+  api-network:
+    external: true
 
